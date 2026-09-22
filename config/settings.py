@@ -1,9 +1,10 @@
 from pathlib import Path
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = "change-this-before-production"
-DEBUG = True
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-this-before-production")
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
+ALLOWED_HOSTS = [host.strip() for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,192.168.1.211,testserver").split(",")]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -42,6 +43,7 @@ TIME_ZONE = "Asia/Tehran"
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
