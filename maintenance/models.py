@@ -21,6 +21,54 @@ class Equipment(models.Model):
     def __str__(self): return f"{self.code} - {self.name}"
 
 
+class EquipmentControlItem(models.Model):
+    """A recurring control belonging to one specific piece of equipment."""
+    class Frequency(models.TextChoices):
+        DAILY = "daily", "روزانه"
+        WEEKLY = "weekly", "هفتگی"
+        BIWEEKLY = "biweekly", "هر دو هفته"
+        MONTHLY = "monthly", "ماهانه"
+        BIMONTHLY = "bimonthly", "هر دو ماه"
+        QUARTERLY = "quarterly", "سه‌ماهه"
+        SEMIANNUAL = "semiannual", "شش‌ماهه"
+        ANNUAL = "annual", "سالانه"
+
+    equipment = models.ForeignKey(Equipment, related_name="control_items", on_delete=models.CASCADE, verbose_name="تجهیز")
+    title = models.CharField("مورد کنترل", max_length=255)
+    help_text = models.CharField("راهنما", max_length=255, blank=True)
+    frequency = models.CharField("تناوب انجام", max_length=20, choices=Frequency.choices, default=Frequency.MONTHLY)
+    next_due_date = models.DateField("تاریخ انجام بعدی", default=timezone.localdate)
+    active = models.BooleanField("فعال", default=True)
+    order = models.PositiveIntegerField("ترتیب", default=1)
+
+    class Meta:
+        verbose_name = "مورد کنترل تجهیز"
+        verbose_name_plural = "موارد کنترل تجهیزات"
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.equipment} — {self.title}"
+
+
+class EquipmentControlLog(models.Model):
+    class Result(models.TextChoices):
+        PASS = "pass", "تأیید شد"
+        ISSUE = "issue", "مشکل دارد"
+        ACTION = "action", "نیاز به اقدام"
+        NA = "na", "قابل بررسی نبود"
+
+    control_item = models.ForeignKey(EquipmentControlItem, related_name="logs", on_delete=models.CASCADE, verbose_name="مورد کنترل")
+    result = models.CharField("نتیجه", max_length=10, choices=Result.choices)
+    note = models.CharField("توضیح", max_length=300, blank=True)
+    performed_at = models.DateTimeField("زمان ثبت", default=timezone.now)
+    work_order = models.ForeignKey("WorkOrder", null=True, blank=True, on_delete=models.SET_NULL, verbose_name="درخواست تعمیر ایجادشده")
+
+    class Meta:
+        verbose_name = "ثبت کنترل تجهیز"
+        verbose_name_plural = "ثبت‌های کنترل تجهیزات"
+        ordering = ["-performed_at"]
+
+
 class ChecklistTemplate(models.Model):
     name=models.CharField("نام چک‌لیست",max_length=150); category=models.ForeignKey(EquipmentCategory,verbose_name="دسته تجهیز",on_delete=models.CASCADE,null=True,blank=True); active=models.BooleanField("فعال",default=True)
     class Meta: verbose_name="الگوی چک‌لیست"; verbose_name_plural="الگوهای چک‌لیست"
@@ -34,9 +82,14 @@ class ChecklistItem(models.Model):
 
 
 class MaintenancePlan(models.Model):
-    class Frequency(models.TextChoices): DAILY="daily","روزانه"; WEEKLY="weekly","هفتگی"; MONTHLY="monthly","ماهانه"; SEMIANNUAL="semiannual","شش‌ماهه"; ANNUAL="annual","سالانه"
+    class Frequency(models.TextChoices): DAILY="daily","روزانه"; WEEKLY="weekly","هفتگی"; BIWEEKLY="biweekly","هر دو هفته"; MONTHLY="monthly","ماهانه"; BIMONTHLY="bimonthly","هر دو ماه"; QUARTERLY="quarterly","سه‌ماهه"; SEMIANNUAL="semiannual","شش‌ماهه"; ANNUAL="annual","سالانه"
+    service_name=models.CharField("نام برنامه سرویس",max_length=150,blank=True)
     equipment=models.ForeignKey(Equipment,verbose_name="تجهیز",on_delete=models.CASCADE); checklist=models.ForeignKey(ChecklistTemplate,verbose_name="چک‌لیست",on_delete=models.PROTECT); frequency=models.CharField("تناوب",max_length=20,choices=Frequency.choices); next_due_date=models.DateField("تاریخ سرویس بعدی"); active=models.BooleanField("فعال",default=True)
     class Meta: verbose_name="برنامه سرویس"; verbose_name_plural="برنامه‌های سرویس"; ordering=["next_due_date"]
+
+    @property
+    def display_name(self):
+        return self.service_name or self.checklist.name
 
 
 class WorkOrder(models.Model):
