@@ -1,13 +1,12 @@
 from datetime import timedelta
-from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Count,Sum,Min
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
-from .forms import AppUserForm,EquipmentCategoryForm,EquipmentControlItemForm,EquipmentForm,EquipmentServicePlanForm,EquipmentSupplyForm,MaintenancePlanForm,WorkOrderForm
+from .forms import AppUserForm,EquipmentCategoryForm,EquipmentControlItemForm,EquipmentForm,EquipmentServicePlanForm,EquipmentSupplyForm,MaintenancePlanForm,MaintenanceReportFilterForm,WorkOrderForm
 from .models import ChecklistItem,ChecklistTemplate,Equipment,EquipmentCategory,EquipmentControlItem,EquipmentControlLog,EquipmentSupply,EquipmentSupplyTransaction,Inspection,InspectionResult,MaintenancePlan,WorkOrder
 manager_required = user_passes_test(lambda u: u.is_superuser or u.groups.filter(name__in=["مدیر اصلی", "سرپرست نت"]).exists())
 
@@ -172,9 +171,26 @@ def work_order_create(request):
     return render(request,"maintenance/form.html",{"form":form,"title":"ثبت درخواست تعمیر","submit":"ثبت درخواست"})
 @login_required
 def reports(request):
-    rows=WorkOrder.objects.values("equipment__name","equipment__code").annotate(count=Count("id"),downtime=Sum("downtime_hours"),cost=Sum("cost")).order_by("-downtime")[:10]
-    today=timezone.localdate(); plans=MaintenancePlan.objects.select_related("equipment","checklist")
-    return render(request,"maintenance/reports.html",{"by_equipment":rows,"plans":plans,"equipment_count":Equipment.objects.count(),"scheduled_services":plans.count(),"overdue_services":plans.filter(active=True,next_due_date__lt=today).count(),"total_cost":WorkOrder.objects.aggregate(value=Sum("cost"))["value"] or Decimal("0"),"total_downtime":WorkOrder.objects.aggregate(value=Sum("downtime_hours"))["value"] or Decimal("0"),"completed_services":Inspection.objects.count()})
+    import jdatetime
+    from .reporting import build_maintenance_report
+    data=request.GET.copy()
+    if not data:
+        today=jdatetime.date.fromgregorian(date=timezone.localdate())
+        data={"start_date":f"{today.year:04d}/{today.month:02d}/01","end_date":today.strftime("%Y/%m/%d"),"status":"all","group_by":"overall"}
+    form=MaintenanceReportFilterForm(data)
+    report=build_maintenance_report(form.cleaned_data) if form.is_valid() else None
+    return render(request,"maintenance/reports.html",{"form":form,"report":report,"query_string":request.GET.urlencode()})
+
+@login_required
+def reports_pdf(request):
+    from .pdf_reports import build_report_pdf
+    from .reporting import build_maintenance_report
+    form=MaintenanceReportFilterForm(request.GET)
+    if not form.is_valid(): return HttpResponse("فیلتر گزارش معتبر نیست.",status=400,content_type="text/plain; charset=utf-8")
+    content=build_report_pdf(build_maintenance_report(form.cleaned_data))
+    response=HttpResponse(content,content_type="application/pdf")
+    response["Content-Disposition"]='attachment; filename="parsnet-maintenance-report.pdf"'
+    return response
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)

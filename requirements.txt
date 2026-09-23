@@ -2,3 +2,6 @@ Django==5.2.17
 jdatetime==6.1.0
 waitress==3.0.2
 whitenoise==6.11.0
+reportlab==4.4.4
+arabic-reshaper==3.0.0
+python-bidi==0.4.2
