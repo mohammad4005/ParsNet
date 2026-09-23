@@ -51,11 +51,16 @@ class MaintenancePlanForm(forms.ModelForm):
             raise forms.ValidationError("تاریخ را به شکل ۱۴۰۵/۰۷/۰۱ وارد کنید.")
 
 
+class ControlItemMultipleChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, obj):
+        return f"{obj.title} — {obj.get_frequency_display()}"
+
+
 class EquipmentServicePlanForm(forms.Form):
     name = forms.CharField(label="نام برنامه سرویس", max_length=150, help_text="مثلاً بازدید هفتگی جرثقیل")
     frequency = forms.ChoiceField(label="تناوب اجرا", choices=MaintenancePlan.Frequency.choices)
     next_due_date = forms.CharField(label="اولین تاریخ اجرا", help_text="مانند ۱۴۰۵/۰۷/۰۱")
-    control_items = forms.ModelMultipleChoiceField(
+    control_items = ControlItemMultipleChoiceField(
         label="موارد کنترل این برنامه",
         queryset=EquipmentControlItem.objects.none(),
         widget=forms.CheckboxSelectMultiple,
