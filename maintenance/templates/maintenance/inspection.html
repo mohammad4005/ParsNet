@@ -1,1 +1,21 @@
-{% extends 'maintenance/base.html' %}{% block heading %}برنامه سرویس: {{plan.display_name}}{% endblock %}{% block content %}<form method="post" class="panel">{% csrf_token %}<p>{{plan.equipment.name}} · {{plan.get_frequency_display}} · موارد انتخاب‌شده را ثبت کنید.</p>{% for item in items %}<div class="check-row"><b>{{forloop.counter}}. {{item.title}}<small>{{item.help_text}}</small></b><div><label><input required type="radio" name="item_{{item.id}}" value="pass"> تأیید شد</label><label><input type="radio" name="item_{{item.id}}" value="issue"> مشکل دارد</label><label><input type="radio" name="item_{{item.id}}" value="action"> نیاز به اقدام</label><label><input type="radio" name="item_{{item.id}}" value="na"> قابل بررسی نبود</label></div><input name="note_{{item.id}}" placeholder="توضیح اختیاری"></div>{% empty %}<p class="empty">موردی برای این برنامه انتخاب نشده است.</p>{% endfor %}<textarea name="notes" placeholder="یادداشت کلی" rows="3"></textarea><p><button class="button">ثبت چک‌لیست</button></p></form>{% endblock %}
+{% extends 'maintenance/base.html' %}
+{% block heading %}برنامه سرویس: {{ plan.display_name }}{% endblock %}
+{% block subtitle %}{{ plan.equipment.name }} · {{ plan.get_frequency_display }}{% endblock %}
+{% block content %}
+<form method="post" class="panel">
+  {% csrf_token %}
+  <div class="performer-box">
+    <div><b>مسئول انجام سرویس</b><small>کاربر واردشده به‌صورت پیش‌فرض انتخاب شده؛ در صورت نیاز شخص دیگری را انتخاب کنید.</small></div>
+    <select name="performed_by" required>
+      {% for person in performers %}
+        <option value="{{ person.id }}"{% if person.id == user.id %} selected{% endif %}>{{ person.get_full_name|default:person.username }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% for item in items %}
+    <div class="check-row"><b>{{ forloop.counter }}. {{ item.title }}<small>{{ item.help_text }}</small></b><div><label><input required type="radio" name="item_{{ item.id }}" value="pass"> تأیید شد</label><label><input type="radio" name="item_{{ item.id }}" value="issue"> مشکل دارد</label><label><input type="radio" name="item_{{ item.id }}" value="action"> نیاز به اقدام</label><label><input type="radio" name="item_{{ item.id }}" value="na"> قابل بررسی نبود</label></div><input name="note_{{ item.id }}" placeholder="توضیح اختیاری"></div>
+  {% empty %}<p class="empty">موردی برای این برنامه انتخاب نشده است.</p>{% endfor %}
+  <textarea name="notes" placeholder="یادداشت کلی" rows="3"></textarea>
+  <p><button class="button">ثبت چک‌لیست</button></p>
+</form>
+{% endblock %}

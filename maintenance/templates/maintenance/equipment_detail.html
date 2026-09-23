@@ -66,6 +66,38 @@
   </div>
 </section>
 
+<section class="panel supplies-panel">
+  <div class="section-heading">
+    <div><h2>وسایل و قطعات مورد نیاز این تجهیز</h2><p class="muted">موجودی، حداقل مورد نیاز و مصرف هر وسیله را از همین بخش مدیریت کنید.</p></div>
+    <span class="count-badge">{{ supplies|length }} وسیله</span>
+  </div>
+  <div class="supply-layout">
+    <form method="post" action="{% url 'equipment_add_supply' equipment.id %}" class="supply-add-form">
+      {% csrf_token %}
+      <h3>افزودن وسیله به انبار تجهیز</h3>
+      {% for field in supply_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
+      <button type="submit">+ ثبت وسیله و موجودی</button>
+    </form>
+    <div class="supply-list">
+      {% for supply in supplies %}
+        <div class="supply-row{% if supply.is_low_stock %} low-stock{% endif %}">
+          <div class="supply-info">
+            <b>{{ supply.name }}</b>
+            <small>حداقل مورد نیاز: {{ supply.minimum_quantity }} {{ supply.unit }}</small>
+          </div>
+          <div class="stock-number"><strong>{{ supply.stock_quantity }}</strong><span>{{ supply.unit }} موجود</span></div>
+          {% if supply.is_low_stock %}<span class="shortage-badge">کمبود موجودی</span>{% else %}<span class="stock-ok-badge">موجودی کافی</span>{% endif %}
+          <form method="post" action="{% url 'equipment_adjust_supply' equipment.id supply.id %}" class="stock-action-form">
+            {% csrf_token %}<input type="number" name="quantity" min="1" required placeholder="تعداد">
+            <button name="operation" value="consume" class="consume-button">ثبت مصرف</button>
+            <button name="operation" value="add" class="add-stock-button">افزایش موجودی</button>
+          </form>
+        </div>
+      {% empty %}<p class="empty">هنوز وسیله یا قطعه‌ای برای این تجهیز ثبت نشده است.</p>{% endfor %}
+    </div>
+  </div>
+</section>
+
 <section class="panel service-builder">
   <div class="section-heading">
     <div>

@@ -69,6 +69,44 @@ class EquipmentControlLog(models.Model):
         ordering = ["-performed_at"]
 
 
+class EquipmentSupply(models.Model):
+    equipment = models.ForeignKey(Equipment, related_name="supplies", on_delete=models.CASCADE, verbose_name="تجهیز")
+    name = models.CharField("نام وسیله یا قطعه", max_length=160)
+    unit = models.CharField("واحد شمارش", max_length=30, default="عدد")
+    stock_quantity = models.PositiveIntegerField("موجودی انبار", default=0)
+    minimum_quantity = models.PositiveIntegerField("حداقل موجودی مورد نیاز", default=1)
+
+    class Meta:
+        verbose_name = "وسیله مورد نیاز تجهیز"
+        verbose_name_plural = "وسایل مورد نیاز تجهیزات"
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(fields=["equipment", "name"], name="unique_equipment_supply")]
+
+    @property
+    def is_low_stock(self):
+        return self.stock_quantity < self.minimum_quantity
+
+    def __str__(self):
+        return f"{self.name} — {self.equipment}"
+
+
+class EquipmentSupplyTransaction(models.Model):
+    class Operation(models.TextChoices):
+        ADD = "add", "افزایش موجودی"
+        CONSUME = "consume", "مصرف"
+
+    supply = models.ForeignKey(EquipmentSupply, related_name="transactions", on_delete=models.CASCADE, verbose_name="وسیله")
+    operation = models.CharField("نوع عملیات", max_length=10, choices=Operation.choices)
+    quantity = models.PositiveIntegerField("تعداد")
+    performed_by = models.ForeignKey("auth.User", null=True, on_delete=models.SET_NULL, verbose_name="ثبت‌کننده")
+    created_at = models.DateTimeField("زمان ثبت", default=timezone.now)
+
+    class Meta:
+        verbose_name = "گردش موجودی تجهیز"
+        verbose_name_plural = "گردش موجودی تجهیزات"
+        ordering = ["-created_at"]
+
+
 class ChecklistTemplate(models.Model):
     name=models.CharField("نام چک‌لیست",max_length=150); category=models.ForeignKey(EquipmentCategory,verbose_name="دسته تجهیز",on_delete=models.CASCADE,null=True,blank=True); active=models.BooleanField("فعال",default=True)
     class Meta: verbose_name="الگوی چک‌لیست"; verbose_name_plural="الگوهای چک‌لیست"
@@ -102,6 +140,7 @@ class WorkOrder(models.Model):
 
 class Inspection(models.Model):
     plan=models.ForeignKey(MaintenancePlan,on_delete=models.CASCADE); performed_at=models.DateTimeField(default=timezone.now); notes=models.TextField(blank=True)
+    performed_by=models.ForeignKey("auth.User",null=True,blank=True,on_delete=models.SET_NULL,verbose_name="مسئول انجام")
 
 
 class InspectionResult(models.Model):

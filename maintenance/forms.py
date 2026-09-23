@@ -2,7 +2,15 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import Group, User
 import jdatetime
-from .models import Equipment, EquipmentCategory, EquipmentControlItem, MaintenancePlan, WorkOrder
+from .models import Equipment, EquipmentCategory, EquipmentControlItem, EquipmentSupply, MaintenancePlan, WorkOrder
+
+
+JALALI_DATE_WIDGET = forms.TextInput(attrs={
+    "class": "jalali-date-input",
+    "readonly": "readonly",
+    "autocomplete": "off",
+    "placeholder": "انتخاب از تقویم شمسی",
+})
 class EquipmentForm(forms.ModelForm):
     class Meta: model=Equipment; fields=["code","name","category","location","operating_unit","manufacturer","model_number","serial_number","capacity","criticality","status"]
 
@@ -14,7 +22,7 @@ class EquipmentCategoryForm(forms.ModelForm):
 
 
 class EquipmentControlItemForm(forms.ModelForm):
-    next_due_date = forms.CharField(label="اولین تاریخ انجام", help_text="مانند ۱۴۰۵/۰۷/۰۱")
+    next_due_date = forms.CharField(label="اولین تاریخ انجام", widget=JALALI_DATE_WIDGET)
 
     class Meta:
         model = EquipmentControlItem
@@ -34,7 +42,7 @@ class EquipmentControlItemForm(forms.ModelForm):
         except (ValueError, TypeError):
             raise forms.ValidationError("تاریخ را به شکل ۱۴۰۵/۰۷/۰۱ وارد کنید.")
 class MaintenancePlanForm(forms.ModelForm):
-    next_due_date = forms.CharField(label="تاریخ سرویس بعدی", help_text="مانند ۱۴۰۵/۰۷/۰۱")
+    next_due_date = forms.CharField(label="تاریخ سرویس بعدی", widget=JALALI_DATE_WIDGET)
     class Meta: model=MaintenancePlan; fields=["equipment","checklist","frequency","next_due_date","active"]
 
     def __init__(self, *args, **kwargs):
@@ -59,7 +67,7 @@ class ControlItemMultipleChoiceField(forms.ModelMultipleChoiceField):
 class EquipmentServicePlanForm(forms.Form):
     name = forms.CharField(label="نام برنامه سرویس", max_length=150, help_text="مثلاً بازدید هفتگی جرثقیل")
     frequency = forms.ChoiceField(label="تناوب اجرا", choices=MaintenancePlan.Frequency.choices)
-    next_due_date = forms.CharField(label="اولین تاریخ اجرا", help_text="مانند ۱۴۰۵/۰۷/۰۱")
+    next_due_date = forms.CharField(label="اولین تاریخ اجرا", widget=JALALI_DATE_WIDGET)
     control_items = ControlItemMultipleChoiceField(
         label="موارد کنترل این برنامه",
         queryset=EquipmentControlItem.objects.none(),
@@ -82,6 +90,18 @@ class EquipmentServicePlanForm(forms.Form):
             return jdatetime.date(year, month, day).togregorian()
         except (ValueError, TypeError):
             raise forms.ValidationError("تاریخ را به شکل ۱۴۰۵/۰۷/۰۱ وارد کنید.")
+
+
+class EquipmentSupplyForm(forms.ModelForm):
+    class Meta:
+        model = EquipmentSupply
+        fields = ["name", "unit", "stock_quantity", "minimum_quantity"]
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("minimum_quantity") is not None and cleaned.get("minimum_quantity") < 1:
+            self.add_error("minimum_quantity", "حداقل موجودی باید دست‌کم یک باشد.")
+        return cleaned
 class WorkOrderForm(forms.ModelForm):
     class Meta: model=WorkOrder; fields=["equipment","title","description","priority","status","downtime_hours","cost","action_taken"]; widgets={"description":forms.Textarea(attrs={"rows":4}),"action_taken":forms.Textarea(attrs={"rows":3})}
 

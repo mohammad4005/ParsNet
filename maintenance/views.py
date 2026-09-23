@@ -2,20 +2,27 @@ from datetime import timedelta
 from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Count,Sum,Min
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
-from .forms import AppUserForm,EquipmentCategoryForm,EquipmentControlItemForm,EquipmentForm,EquipmentServicePlanForm,MaintenancePlanForm,WorkOrderForm
-from .models import ChecklistItem,ChecklistTemplate,Equipment,EquipmentCategory,EquipmentControlItem,EquipmentControlLog,Inspection,InspectionResult,MaintenancePlan,WorkOrder
+from .forms import AppUserForm,EquipmentCategoryForm,EquipmentControlItemForm,EquipmentForm,EquipmentServicePlanForm,EquipmentSupplyForm,MaintenancePlanForm,WorkOrderForm
+from .models import ChecklistItem,ChecklistTemplate,Equipment,EquipmentCategory,EquipmentControlItem,EquipmentControlLog,EquipmentSupply,EquipmentSupplyTransaction,Inspection,InspectionResult,MaintenancePlan,WorkOrder
 manager_required = user_passes_test(lambda u: u.is_superuser or u.groups.filter(name__in=["مدیر اصلی", "سرپرست نت"]).exists())
 
 CONTROL_FREQUENCY_DAYS = {"daily": 1, "weekly": 7, "biweekly": 14, "monthly": 30, "bimonthly": 60, "quarterly": 91, "semiannual": 182, "annual": 365}
 
 @login_required
 def dashboard(request):
-    today=timezone.localdate(); due=MaintenancePlan.objects.filter(active=True,next_due_date__lte=today).select_related("equipment","checklist")
-    due_controls=EquipmentControlItem.objects.filter(active=True,next_due_date__lte=today).select_related("equipment")
-    return render(request,"maintenance/dashboard.html",{"equipment_count":Equipment.objects.count(),"critical_count":Equipment.objects.filter(criticality="high").count(),"open_orders":WorkOrder.objects.exclude(status="done").count(),"due_plans":due[:6],"due_controls":due_controls[:6],"due_controls_count":due_controls.count(),"recent_orders":WorkOrder.objects.select_related("equipment")[:6]})
+    today=timezone.localdate()
+    due=MaintenancePlan.objects.filter(active=True,next_due_date__lte=today).select_related("equipment","checklist")
+    due_plans=list(due[:8])
+    for plan in due_plans: plan.days_overdue=(today-plan.next_due_date).days
+    controls=EquipmentControlItem.objects.filter(active=True,next_due_date__lte=today).select_related("equipment")
+    due_controls=list(controls[:8])
+    for item in due_controls: item.days_overdue=(today-item.next_due_date).days
+    return render(request,"maintenance/dashboard.html",{"equipment_count":Equipment.objects.count(),"critical_count":Equipment.objects.filter(criticality="high").count(),"open_orders":WorkOrder.objects.exclude(status="done").count(),"due_plans":due_plans,"due_plans_count":due.count(),"due_controls":due_controls,"due_controls_count":controls.count(),"recent_orders":WorkOrder.objects.select_related("equipment")[:6]})
 @login_required
 def equipment_list(request):
     items=Equipment.objects.select_related("category");q=request.GET.get("q","").strip()
@@ -38,8 +45,8 @@ def category_list(request):
 def equipment_detail(request,pk):
     equipment=get_object_or_404(Equipment.objects.select_related("category"),pk=pk)
     plans=MaintenancePlan.objects.filter(equipment=equipment).select_related("checklist").prefetch_related("checklist__items")
-    items=equipment.control_items.all()
-    return render(request,"maintenance/equipment_detail.html",{"equipment":equipment,"plans":plans,"items":items,"today":timezone.localdate(),"control_form":EquipmentControlItemForm(initial={"next_due_date": timezone.localdate()}),"service_plan_form":EquipmentServicePlanForm(equipment=equipment)})
+    items=equipment.control_items.all(); supplies=equipment.supplies.all()
+    return render(request,"maintenance/equipment_detail.html",{"equipment":equipment,"plans":plans,"items":items,"supplies":supplies,"today":timezone.localdate(),"control_form":EquipmentControlItemForm(initial={"next_due_date": timezone.localdate()}),"service_plan_form":EquipmentServicePlanForm(equipment=equipment),"supply_form":EquipmentSupplyForm()})
 @login_required
 @manager_required
 def equipment_add_check_item(request,pk):
@@ -70,6 +77,44 @@ def equipment_create_service_plan(request, pk):
     else:
         messages.error(request, "برنامه سرویس ثبت نشد؛ اطلاعات را بررسی کنید.")
     return redirect("equipment_detail", pk=equipment.pk)
+@login_required
+def equipment_add_supply(request, pk):
+    equipment=get_object_or_404(Equipment,pk=pk)
+    form=EquipmentSupplyForm(request.POST)
+    if form.is_valid():
+        quantity=form.cleaned_data["stock_quantity"]
+        supply=EquipmentSupply.objects.filter(equipment=equipment,name__iexact=form.cleaned_data["name"]).first()
+        if supply:
+            supply.stock_quantity += quantity
+            supply.unit=form.cleaned_data["unit"]; supply.minimum_quantity=form.cleaned_data["minimum_quantity"]
+            supply.save(update_fields=["stock_quantity","unit","minimum_quantity"])
+            message="موجودی وسیله قبلی افزایش یافت."
+        else:
+            supply=form.save(commit=False); supply.equipment=equipment; supply.save(); message="وسیله مورد نیاز به انبار این تجهیز اضافه شد."
+        if quantity:
+            EquipmentSupplyTransaction.objects.create(supply=supply,operation="add",quantity=quantity,performed_by=request.user)
+        messages.success(request,message)
+    else: messages.error(request,"وسیله ثبت نشد؛ اطلاعات را بررسی کنید.")
+    return redirect("equipment_detail",pk=equipment.pk)
+@login_required
+def equipment_adjust_supply(request, pk, supply_pk):
+    equipment=get_object_or_404(Equipment,pk=pk)
+    try: quantity=int(request.POST.get("quantity",0))
+    except (TypeError,ValueError): quantity=0
+    operation=request.POST.get("operation")
+    if quantity < 1 or operation not in {"add","consume"}:
+        messages.error(request,"تعداد معتبر وارد کنید."); return redirect("equipment_detail",pk=equipment.pk)
+    with transaction.atomic():
+        supply=get_object_or_404(EquipmentSupply.objects.select_for_update(),pk=supply_pk,equipment=equipment)
+        if operation == "consume" and quantity > supply.stock_quantity:
+            messages.error(request,f"موجودی {supply.name} کافی نیست؛ فقط {supply.stock_quantity} {supply.unit} موجود است.")
+            return redirect("equipment_detail",pk=equipment.pk)
+        supply.stock_quantity += quantity if operation == "add" else -quantity
+        supply.save(update_fields=["stock_quantity"])
+        EquipmentSupplyTransaction.objects.create(supply=supply,operation=operation,quantity=quantity,performed_by=request.user)
+    if supply.is_low_stock: messages.warning(request,f"هشدار کمبود: موجودی {supply.name} از حداقل مورد نیاز کمتر شده است.")
+    else: messages.success(request,"گردش موجودی ثبت شد.")
+    return redirect("equipment_detail",pk=equipment.pk)
 @login_required
 def daily_controls(request):
     today=timezone.localdate()
@@ -107,13 +152,14 @@ def plan_create(request):
 def inspect_plan(request,pk):
     plan=get_object_or_404(MaintenancePlan.objects.select_related("equipment","checklist"),pk=pk);items=plan.checklist.items.all()
     if request.method=="POST":
-        inspection=Inspection.objects.create(plan=plan,notes=request.POST.get("notes","")); issue=False
+        performer=User.objects.filter(pk=request.POST.get("performed_by"),is_active=True).first() or request.user
+        inspection=Inspection.objects.create(plan=plan,notes=request.POST.get("notes",""),performed_by=performer); issue=False
         for item in items:
             result=request.POST.get(f"item_{item.id}");note=request.POST.get(f"note_{item.id}","")
             if result: InspectionResult.objects.create(inspection=inspection,item=item,result=result,note=note);issue|=result in {"issue","action"}
         if issue: WorkOrder.objects.create(equipment=plan.equipment,title=f"پیگیری سرویس: {plan.display_name}",description="مورد نیازمند اقدام در چک‌لیست سرویس ثبت شده است.")
         days={"daily":1,"weekly":7,"biweekly":14,"monthly":30,"bimonthly":60,"quarterly":91,"semiannual":182,"annual":365}[plan.frequency];plan.next_due_date+=timedelta(days=days);plan.save(update_fields=["next_due_date"]);messages.success(request,"چک‌لیست ثبت و سرویس بعدی به‌روزرسانی شد.");return redirect("dashboard")
-    return render(request,"maintenance/inspection.html",{"plan":plan,"items":items})
+    return render(request,"maintenance/inspection.html",{"plan":plan,"items":items,"performers":User.objects.filter(is_active=True).order_by("first_name","last_name","username")})
 @login_required
 def work_order_list(request): return render(request,"maintenance/work_order_list.html",{"orders":WorkOrder.objects.select_related("equipment")})
 @login_required

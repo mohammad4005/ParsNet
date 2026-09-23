@@ -9,4 +9,4 @@ class EquipmentAdmin(admin.ModelAdmin): list_display=("code","name","category","
 class EquipmentControlItemAdmin(admin.ModelAdmin): list_display=("equipment", "title", "frequency", "next_due_date", "active"); list_filter=("frequency", "active"); search_fields=("equipment__name", "title")
 @admin.register(WorkOrder)
 class WorkOrderAdmin(admin.ModelAdmin): list_display=("id","title","equipment","priority","status","reported_at")
-admin.site.register([EquipmentCategory,EquipmentControlLog,MaintenancePlan,Inspection,InspectionResult])
+admin.site.register([EquipmentCategory,EquipmentControlLog,EquipmentSupply,EquipmentSupplyTransaction,MaintenancePlan,Inspection,InspectionResult])
