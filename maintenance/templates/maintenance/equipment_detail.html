@@ -48,7 +48,7 @@
     </div>
     <span class="count-badge">{{ items|length }} مورد</span>
   </div>
-  <div class="control-list">
+  <div class="control-list card-control-list">
     {% for item in items %}
       <div class="control-list-row">
         <span class="control-number">{{ forloop.counter }}</span>
@@ -66,7 +66,8 @@
   </div>
 </section>
 
-<section class="panel supplies-panel">
+<section class="equipment-workspace-grid">
+<div class="panel supplies-panel">
   <div class="section-heading">
     <div><h2>وسایل و قطعات مورد نیاز این تجهیز</h2><p class="muted">موجودی، حداقل مورد نیاز و مصرف هر وسیله را از همین بخش مدیریت کنید.</p></div>
     <span class="count-badge">{{ supplies|length }} وسیله</span>
@@ -96,9 +97,9 @@
       {% empty %}<p class="empty">هنوز وسیله یا قطعه‌ای برای این تجهیز ثبت نشده است.</p>{% endfor %}
     </div>
   </div>
-</section>
+</div>
 
-<section class="panel service-builder">
+<div class="panel service-builder">
   <div class="section-heading">
     <div>
       <h2>ساخت برنامه سرویس</h2>
@@ -129,6 +130,7 @@
     </div>
     <div class="form-actions"><button type="submit">+ ساخت برنامه سرویس</button></div>
   </form>
+</div>
 </section>
 
 <section class="panel service-plans-panel">
@@ -136,7 +138,7 @@
     <div><h2>برنامه‌های سرویس این دستگاه</h2><p class="muted">برنامه‌های ساخته‌شده و موارد انتخابی هرکدام.</p></div>
     <span class="count-badge">{{ plans|length }} برنامه</span>
   </div>
-  {% for plan in plans %}
+  <div class="service-plan-grid">{% for plan in plans %}
     <div class="service-plan-row">
       <div class="service-plan-main">
         <b>{{ plan.display_name }}</b>
@@ -149,6 +151,6 @@
     </div>
   {% empty %}
     <p class="empty">هنوز برنامه سرویس انتخابی برای این دستگاه ساخته نشده است.</p>
-  {% endfor %}
+  {% endfor %}</div>
 </section>
 {% endblock %}

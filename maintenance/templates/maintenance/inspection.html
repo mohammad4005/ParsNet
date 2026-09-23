@@ -12,9 +12,9 @@
       {% endfor %}
     </select>
   </div>
-  {% for item in items %}
-    <div class="check-row"><b>{{ forloop.counter }}. {{ item.title }}<small>{{ item.help_text }}</small></b><div><label><input required type="radio" name="item_{{ item.id }}" value="pass"> تأیید شد</label><label><input type="radio" name="item_{{ item.id }}" value="issue"> مشکل دارد</label><label><input type="radio" name="item_{{ item.id }}" value="action"> نیاز به اقدام</label><label><input type="radio" name="item_{{ item.id }}" value="na"> قابل بررسی نبود</label></div><input name="note_{{ item.id }}" placeholder="توضیح اختیاری"></div>
-  {% empty %}<p class="empty">موردی برای این برنامه انتخاب نشده است.</p>{% endfor %}
+  <div class="inspection-grid">{% for item in items %}
+    <div class="inspection-card"><div class="inspection-title"><span>{{ forloop.counter }}</span><b>{{ item.title }}<small>{{ item.help_text }}</small></b></div><div class="result-options"><label><input required type="radio" name="item_{{ item.id }}" value="pass"> تأیید شد</label><label><input type="radio" name="item_{{ item.id }}" value="issue"> مشکل دارد</label><label><input type="radio" name="item_{{ item.id }}" value="action"> نیاز به اقدام</label><label><input type="radio" name="item_{{ item.id }}" value="na"> بررسی نشد</label></div><input name="note_{{ item.id }}" placeholder="توضیح اختیاری"></div>
+  {% empty %}<p class="empty">موردی برای این برنامه انتخاب نشده است.</p>{% endfor %}</div>
   <textarea name="notes" placeholder="یادداشت کلی" rows="3"></textarea>
   <p><button class="button">ثبت چک‌لیست</button></p>
 </form>
