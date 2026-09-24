@@ -133,9 +133,46 @@ class MaintenancePlan(models.Model):
 class WorkOrder(models.Model):
     class Priority(models.TextChoices): NORMAL="normal","عادی"; URGENT="urgent","اضطراری"; LONG_TERM="long","درازمدت"
     class Status(models.TextChoices): NEW="new","جدید"; IN_PROGRESS="progress","در حال انجام"; DONE="done","تکمیل‌شده"
+    class RepairMethod(models.TextChoices):
+        UNDECIDED = "undecided", "هنوز تعیین نشده"
+        INTERNAL = "internal", "تعمیر داخل شرکت"
+        EXTERNAL = "external", "برون‌سپاری به تعمیرگاه"
     equipment=models.ForeignKey(Equipment,verbose_name="تجهیز",on_delete=models.PROTECT); title=models.CharField("عنوان درخواست",max_length=180); description=models.TextField("شرح مشکل"); priority=models.CharField("اولویت",max_length=10,choices=Priority.choices,default=Priority.NORMAL); status=models.CharField("وضعیت",max_length=12,choices=Status.choices,default=Status.NEW)
+    repair_method=models.CharField("روش انجام تعمیر",max_length=12,choices=RepairMethod.choices,default=RepairMethod.UNDECIDED)
     reported_at=models.DateTimeField("زمان اعلام",default=timezone.now); downtime_hours=models.DecimalField("مدت توقف (ساعت)",max_digits=7,decimal_places=2,default=0); cost=models.DecimalField("هزینه تعمیرات",max_digits=14,decimal_places=0,default=0); action_taken=models.TextField("اقدام انجام‌شده",blank=True); completed_at=models.DateTimeField("زمان اتمام",null=True,blank=True)
     class Meta: verbose_name="درخواست کار"; verbose_name_plural="درخواست‌های کار"; ordering=["-reported_at"]
+
+
+class ExternalRepairRecord(models.Model):
+    class QualityStatus(models.TextChoices):
+        PENDING = "pending", "در انتظار کنترل"
+        ACCEPTED = "accepted", "تأیید ورود و سلامت"
+        REJECTED = "rejected", "رد کنترل کیفیت"
+
+    work_order = models.OneToOneField(WorkOrder, related_name="external_repair", on_delete=models.PROTECT, verbose_name="درخواست تعمیر")
+    repair_shop = models.CharField("نام تعمیرگاه بیرونی", max_length=180)
+    sent_out_date = models.DateField("تاریخ خروج از شرکت", null=True, blank=True)
+    returned_date = models.DateField("تاریخ ورود مجدد به شرکت", null=True, blank=True)
+    repair_description = models.TextField("شرح تعمیر انجام‌شده در تعمیرگاه", blank=True)
+    quality_status = models.CharField("نتیجه کنترل هنگام ورود", max_length=12, choices=QualityStatus.choices, default=QualityStatus.PENDING)
+    quality_note = models.TextField("توضیحات کنترل کیفیت", blank=True)
+    recorded_by = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL, verbose_name="ثبت‌کننده")
+    created_at = models.DateTimeField("زمان ایجاد", auto_now_add=True)
+    updated_at = models.DateTimeField("آخرین به‌روزرسانی", auto_now=True)
+
+    class Meta:
+        verbose_name = "سابقه تعمیر بیرونی"
+        verbose_name_plural = "سوابق تعمیرات بیرونی"
+        ordering = ["-sent_out_date", "-created_at"]
+
+    @property
+    def days_outside(self):
+        if not self.sent_out_date:
+            return None
+        return ((self.returned_date or timezone.localdate()) - self.sent_out_date).days
+
+    def __str__(self):
+        return f"{self.work_order.equipment} — {self.repair_shop}"
 
 
 class Inspection(models.Model):

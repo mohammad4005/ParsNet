@@ -154,5 +154,22 @@
     <p class="empty">هنوز برنامه سرویس انتخابی برای این دستگاه ساخته نشده است.</p>
   {% endfor %}</div>
 </section>
+
+<section class="panel equipment-repair-history">
+  <div class="section-heading">
+    <div><h2>تاریخچه تعمیرات این تجهیز</h2><p class="muted">تمام تعمیرات داخلی و بیرونی، حتی پس از تکمیل، برای همیشه در این پرونده باقی می‌مانند.</p></div>
+    <span class="count-badge">{{ repair_history|length }} سابقه</span>
+  </div>
+  <div class="compact-repair-history">
+    {% for order in repair_history %}
+      <a href="{% url 'work_order_detail' order.id %}" class="compact-repair-item{% if order.repeat_after_days != None %} repeated{% endif %}">
+        <div><b>{{ order.title }}</b><small>{{ order.reported_at|jalali_datetime }} · {{ order.get_repair_method_display }}</small></div>
+        {% if order.external_repair %}<span><small>تعمیرگاه</small><b>{{ order.external_repair.repair_shop }}</b></span>{% endif %}
+        <span class="badge">{{ order.get_status_display }}</span>
+        {% if order.repeat_after_days != None %}<em>خرابی مجدد پس از {{ order.repeat_after_days }} روز</em>{% endif %}
+      </a>
+    {% empty %}<p class="empty">هنوز سابقه تعمیری برای این تجهیز ثبت نشده است.</p>{% endfor %}
+  </div>
+</section>
 </div>
 {% endblock %}

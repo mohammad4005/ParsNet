@@ -1,6 +1,23 @@
-{% extends 'maintenance/base.html' %}{% load jalali_dates %}
+{% extends 'maintenance/base.html' %}
+{% load jalali_dates %}
 {% block heading %}درخواست‌های تعمیر{% endblock %}
-{% block subtitle %}خرابی‌ها را به‌صورت کارت‌های وضعیت‌دار پیگیری کنید.{% endblock %}
-{% block content %}<div class="toolbar"><span>درخواست‌های جدید، در حال انجام و تکمیل‌شده.</span><a class="button" href="{% url 'work_order_create' %}">+ ثبت درخواست</a></div><section class="entity-grid work-order-grid">
-{% for order in orders %}<article class="entity-card work-order-card"><div class="card-top"><span class="badge">{{ order.get_status_display }}</span><span class="priority-chip {{ order.priority }}">{{ order.get_priority_display }}</span></div><h2>{{ order.title }}</h2><p>{{ order.equipment.name }}</p><div class="card-meta"><span><small>زمان اعلام</small><b>{{ order.reported_at|jalali_datetime }}</b></span><span><small>توقف</small><b>{{ order.downtime_hours }} ساعت</b></span></div>{% if order.description %}<div class="card-note">{{ order.description|truncatechars:100 }}</div>{% endif %}</article>{% empty %}<div class="panel empty">درخواستی ثبت نشده است.</div>{% endfor %}
-</section>{% endblock %}
+{% block subtitle %}تعمیرات داخلی، برون‌سپاری و سوابق دائمی هر تجهیز را یکجا پیگیری کنید.{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <span>تمام مراحل تعمیر، خروج، ورود و کنترل کیفیت در تاریخچه تجهیز باقی می‌ماند.</span>
+  <a class="button" href="{% url 'work_order_create' %}">+ ثبت درخواست</a>
+</div>
+<section class="entity-grid work-order-grid">
+  {% for order in orders %}
+    <article class="entity-card work-order-card{% if order.repeat_after_days != None %} repeat-repair-card{% endif %}">
+      <div class="card-top"><span class="badge">{{ order.get_status_display }}</span><span class="priority-chip {{ order.priority }}">{{ order.get_priority_display }}</span></div>
+      <h2>{{ order.title }}</h2><p>{{ order.equipment.name }}</p>
+      <span class="repair-method-badge {{ order.repair_method }}">{{ order.get_repair_method_display }}</span>
+      {% if order.repeat_after_days != None %}<div class="repeat-alert">⚠ خرابی مجدد فقط {{ order.repeat_after_days }} روز پس از تعمیر قبلی</div>{% endif %}
+      <div class="card-meta"><span><small>زمان اعلام</small><b>{{ order.reported_at|jalali_datetime }}</b></span><span><small>توقف</small><b>{{ order.downtime_hours }} ساعت</b></span></div>
+      {% if order.external_repair %}<div class="card-note"><b>{{ order.external_repair.repair_shop }}</b>{% if order.external_repair.sent_out_date %}<small>خروج: {{ order.external_repair.sent_out_date|jalali }}</small>{% endif %}</div>{% elif order.description %}<div class="card-note">{{ order.description|truncatechars:90 }}</div>{% endif %}
+      <a class="card-action" href="{% url 'work_order_detail' order.id %}">مشاهده، ثبت اقدام و تاریخچه ←</a>
+    </article>
+  {% empty %}<div class="panel empty">درخواستی ثبت نشده است.</div>{% endfor %}
+</section>
+{% endblock %}

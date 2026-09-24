@@ -6,11 +6,33 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
-from .forms import AppUserForm,EquipmentCategoryForm,EquipmentControlItemForm,EquipmentForm,EquipmentServicePlanForm,EquipmentSupplyForm,MaintenancePlanForm,MaintenanceReportFilterForm,WorkOrderForm
-from .models import ChecklistItem,ChecklistTemplate,Equipment,EquipmentCategory,EquipmentControlItem,EquipmentControlLog,EquipmentSupply,EquipmentSupplyTransaction,Inspection,InspectionResult,MaintenancePlan,WorkOrder
+from .forms import AppUserForm,EquipmentCategoryForm,EquipmentControlItemForm,EquipmentForm,EquipmentServicePlanForm,EquipmentSupplyForm,ExternalRepairForm,MaintenancePlanForm,MaintenanceReportFilterForm,WorkOrderForm,WorkOrderProgressForm
+from .models import ChecklistItem,ChecklistTemplate,Equipment,EquipmentCategory,EquipmentControlItem,EquipmentControlLog,EquipmentSupply,EquipmentSupplyTransaction,ExternalRepairRecord,Inspection,InspectionResult,MaintenancePlan,WorkOrder
 manager_required = user_passes_test(lambda u: u.is_superuser or u.groups.filter(name__in=["مدیر اصلی", "سرپرست نت"]).exists())
 
 CONTROL_FREQUENCY_DAYS = {"daily": 1, "weekly": 7, "biweekly": 14, "monthly": 30, "bimonthly": 60, "quarterly": 91, "semiannual": 182, "annual": 365}
+
+
+def _decorate_repair_history(orders):
+    """Add the latest prior repair and a short-interval repeat warning to work orders."""
+    orders = list(orders)
+    last_closed = {}
+    for order in sorted(orders, key=lambda item: item.reported_at):
+        previous_date = last_closed.get(order.equipment_id)
+        order.previous_repair_date = previous_date
+        order.repeat_after_days = None
+        if previous_date:
+            days = (order.reported_at.date() - previous_date).days
+            if 0 <= days <= 30:
+                order.repeat_after_days = days
+        try:
+            external = order.external_repair
+        except ExternalRepairRecord.DoesNotExist:
+            external = None
+        closed_date = external.returned_date if external and external.returned_date else (order.completed_at.date() if order.completed_at else None)
+        if closed_date:
+            last_closed[order.equipment_id] = max(last_closed.get(order.equipment_id, closed_date), closed_date)
+    return sorted(orders, key=lambda item: item.reported_at, reverse=True)
 
 @login_required
 def dashboard(request):
@@ -45,7 +67,8 @@ def equipment_detail(request,pk):
     equipment=get_object_or_404(Equipment.objects.select_related("category"),pk=pk)
     plans=MaintenancePlan.objects.filter(equipment=equipment).select_related("checklist").prefetch_related("checklist__items")
     items=equipment.control_items.all(); supplies=equipment.supplies.all()
-    return render(request,"maintenance/equipment_detail.html",{"equipment":equipment,"plans":plans,"items":items,"supplies":supplies,"today":timezone.localdate(),"control_form":EquipmentControlItemForm(initial={"next_due_date": timezone.localdate()}),"service_plan_form":EquipmentServicePlanForm(equipment=equipment),"supply_form":EquipmentSupplyForm()})
+    repair_history=_decorate_repair_history(WorkOrder.objects.filter(equipment=equipment).select_related("equipment","external_repair"))[:8]
+    return render(request,"maintenance/equipment_detail.html",{"equipment":equipment,"plans":plans,"items":items,"supplies":supplies,"repair_history":repair_history,"today":timezone.localdate(),"control_form":EquipmentControlItemForm(initial={"next_due_date": timezone.localdate()}),"service_plan_form":EquipmentServicePlanForm(equipment=equipment),"supply_form":EquipmentSupplyForm()})
 @login_required
 @manager_required
 def equipment_add_check_item(request,pk):
@@ -160,7 +183,9 @@ def inspect_plan(request,pk):
         days={"daily":1,"weekly":7,"biweekly":14,"monthly":30,"bimonthly":60,"quarterly":91,"semiannual":182,"annual":365}[plan.frequency];plan.next_due_date+=timedelta(days=days);plan.save(update_fields=["next_due_date"]);messages.success(request,"چک‌لیست ثبت و سرویس بعدی به‌روزرسانی شد.");return redirect("dashboard")
     return render(request,"maintenance/inspection.html",{"plan":plan,"items":items,"performers":User.objects.filter(is_active=True).order_by("first_name","last_name","username")})
 @login_required
-def work_order_list(request): return render(request,"maintenance/work_order_list.html",{"orders":WorkOrder.objects.select_related("equipment")})
+def work_order_list(request):
+    orders=_decorate_repair_history(WorkOrder.objects.select_related("equipment","external_repair"))
+    return render(request,"maintenance/work_order_list.html",{"orders":orders})
 @login_required
 def work_order_create(request):
     form=WorkOrderForm(request.POST or None)
@@ -169,6 +194,62 @@ def work_order_create(request):
         if order.status=="done":order.completed_at=timezone.now()
         order.save();messages.success(request,"درخواست تعمیر ثبت شد.");return redirect("work_order_list")
     return render(request,"maintenance/form.html",{"form":form,"title":"ثبت درخواست تعمیر","submit":"ثبت درخواست"})
+
+
+@login_required
+def work_order_detail(request, pk):
+    order=get_object_or_404(WorkOrder.objects.select_related("equipment__category","external_repair"),pk=pk)
+    equipment_orders=_decorate_repair_history(WorkOrder.objects.filter(equipment=order.equipment).select_related("equipment","external_repair"))
+    current=next((item for item in equipment_orders if item.pk == order.pk),order)
+    history=[item for item in equipment_orders if item.pk != order.pk][:12]
+    try: external=order.external_repair
+    except ExternalRepairRecord.DoesNotExist: external=None
+    return render(request,"maintenance/work_order_detail.html",{
+        "order":current,"history":history,"external":external,
+        "progress_form":WorkOrderProgressForm(instance=order),
+        "external_form":ExternalRepairForm(instance=external),
+    })
+
+
+@login_required
+def work_order_update(request, pk):
+    order=get_object_or_404(WorkOrder,pk=pk)
+    form=WorkOrderProgressForm(request.POST,instance=order)
+    if form.is_valid():
+        order=form.save(commit=False)
+        if order.status == WorkOrder.Status.DONE:
+            order.completed_at=order.completed_at or timezone.now()
+        else:
+            order.completed_at=None
+        order.save()
+        messages.success(request,"وضعیت و اقدام واحد تعمیرات به‌روزرسانی شد.")
+    else:
+        messages.error(request,"اطلاعات تعمیر به‌روزرسانی نشد؛ موارد فرم را بررسی کنید.")
+    return redirect("work_order_detail",pk=order.pk)
+
+
+@login_required
+def external_repair_update(request, pk):
+    order=get_object_or_404(WorkOrder,pk=pk)
+    if order.repair_method != WorkOrder.RepairMethod.EXTERNAL:
+        messages.error(request,"ابتدا روش انجام تعمیر را روی «برون‌سپاری به تعمیرگاه» قرار دهید.")
+        return redirect("work_order_detail",pk=order.pk)
+    try: external=order.external_repair
+    except ExternalRepairRecord.DoesNotExist: external=None
+    form=ExternalRepairForm(request.POST,instance=external)
+    if form.is_valid():
+        record=form.save(commit=False); record.work_order=order; record.recorded_by=request.user; record.save()
+        if record.sent_out_date and order.status == WorkOrder.Status.NEW:
+            order.status=WorkOrder.Status.IN_PROGRESS
+        if record.returned_date and record.quality_status == ExternalRepairRecord.QualityStatus.ACCEPTED:
+            order.status=WorkOrder.Status.DONE; order.completed_at=order.completed_at or timezone.now()
+        elif record.quality_status == ExternalRepairRecord.QualityStatus.REJECTED:
+            order.status=WorkOrder.Status.IN_PROGRESS; order.completed_at=None
+        order.save(update_fields=["status","completed_at"])
+        messages.success(request,"اطلاعات خروج، ورود و کنترل تعمیرگاه ثبت شد.")
+    else:
+        messages.error(request,"اطلاعات تعمیرگاه ثبت نشد؛ تاریخ‌ها و نتیجه کنترل را بررسی کنید.")
+    return redirect("work_order_detail",pk=order.pk)
 @login_required
 def reports(request):
     import jdatetime

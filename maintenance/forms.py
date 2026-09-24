@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import Group, User
 import jdatetime
-from .models import Equipment, EquipmentCategory, EquipmentControlItem, EquipmentSupply, MaintenancePlan, WorkOrder
+from .models import Equipment, EquipmentCategory, EquipmentControlItem, EquipmentSupply, ExternalRepairRecord, MaintenancePlan, WorkOrder
 
 
 JALALI_DATE_WIDGET = forms.TextInput(attrs={
@@ -151,7 +151,69 @@ class MaintenanceReportFilterForm(forms.Form):
             self.add_error("end_date", "تاریخ پایان باید بعد از تاریخ شروع باشد.")
         return cleaned
 class WorkOrderForm(forms.ModelForm):
-    class Meta: model=WorkOrder; fields=["equipment","title","description","priority","status","downtime_hours","cost","action_taken"]; widgets={"description":forms.Textarea(attrs={"rows":4}),"action_taken":forms.Textarea(attrs={"rows":3})}
+    class Meta:
+        model = WorkOrder
+        fields = ["equipment", "title", "description", "priority", "repair_method", "status", "downtime_hours", "cost", "action_taken"]
+        widgets = {"description": forms.Textarea(attrs={"rows": 4}), "action_taken": forms.Textarea(attrs={"rows": 3})}
+
+
+class WorkOrderProgressForm(forms.ModelForm):
+    class Meta:
+        model = WorkOrder
+        fields = ["repair_method", "status", "action_taken", "downtime_hours", "cost"]
+        widgets = {"action_taken": forms.Textarea(attrs={"rows": 3, "placeholder": "شرح اقدام واحد تعمیرات یا تعمیر انجام‌شده داخل شرکت"})}
+
+
+class ExternalRepairForm(forms.ModelForm):
+    sent_out_date = forms.CharField(label="تاریخ خروج از شرکت", required=False, widget=JALALI_DATE_WIDGET)
+    returned_date = forms.CharField(label="تاریخ ورود مجدد به شرکت", required=False, widget=JALALI_DATE_WIDGET)
+
+    class Meta:
+        model = ExternalRepairRecord
+        fields = ["repair_shop", "sent_out_date", "returned_date", "repair_description", "quality_status", "quality_note"]
+        widgets = {
+            "repair_description": forms.Textarea(attrs={"rows": 3}),
+            "quality_note": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("sent_out_date", "returned_date"):
+            date_value = self.initial.get(field_name) or getattr(self.instance, field_name, None)
+            if date_value:
+                self.initial[field_name] = jdatetime.date.fromgregorian(date=date_value).strftime("%Y/%m/%d")
+
+    @staticmethod
+    def _clean_optional_jalali(raw):
+        if not raw:
+            return None
+        value = raw.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")).replace("-", "/")
+        year, month, day = [int(part) for part in value.split("/")]
+        return jdatetime.date(year, month, day).togregorian()
+
+    def clean_sent_out_date(self):
+        try:
+            return self._clean_optional_jalali(self.cleaned_data.get("sent_out_date"))
+        except (ValueError, TypeError):
+            raise forms.ValidationError("تاریخ خروج را از تقویم شمسی انتخاب کنید.")
+
+    def clean_returned_date(self):
+        try:
+            return self._clean_optional_jalali(self.cleaned_data.get("returned_date"))
+        except (ValueError, TypeError):
+            raise forms.ValidationError("تاریخ ورود را از تقویم شمسی انتخاب کنید.")
+
+    def clean(self):
+        cleaned = super().clean()
+        sent = cleaned.get("sent_out_date")
+        returned = cleaned.get("returned_date")
+        if returned and not sent:
+            self.add_error("sent_out_date", "ابتدا تاریخ خروج تجهیز را ثبت کنید.")
+        if sent and returned and returned < sent:
+            self.add_error("returned_date", "تاریخ ورود نمی‌تواند قبل از تاریخ خروج باشد.")
+        if cleaned.get("quality_status") != ExternalRepairRecord.QualityStatus.PENDING and not returned:
+            self.add_error("quality_status", "نتیجه کنترل کیفیت پس از ثبت تاریخ ورود قابل انتخاب است.")
+        return cleaned
 
 
 class AppUserForm(UserCreationForm):

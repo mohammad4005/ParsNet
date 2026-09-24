@@ -1,0 +1,30 @@
+{% extends 'maintenance/base.html' %}
+{% load jalali_dates %}
+{% block heading %}پیگیری تعمیر · {{ order.equipment.name }}{% endblock %}
+{% block subtitle %}از تصمیم تعمیر داخلی یا بیرونی تا ورود مجدد، کنترل کیفیت و سابقه دائمی تجهیز.{% endblock %}
+{% block content %}
+{% if order.repeat_after_days != None %}<div class="repeat-warning"><b>هشدار خرابی تکراری</b><span>این تجهیز فقط {{ order.repeat_after_days }} روز بعد از تعمیر قبلی دوباره برای تعمیرات ثبت شده است. علت ریشه‌ای و کیفیت تعمیر قبلی را بررسی کنید.</span></div>{% endif %}
+<section class="repair-overview-grid">
+  <article class="panel repair-summary-card">
+    <div class="section-heading"><div><h2>{{ order.title }}</h2><p class="muted">{{ order.description }}</p></div><span class="badge">{{ order.get_status_display }}</span></div>
+    <dl><div><dt>تجهیز</dt><dd>{{ order.equipment.name }}</dd></div><div><dt>کد تجهیز</dt><dd>{{ order.equipment.code }}</dd></div><div><dt>اولویت</dt><dd>{{ order.get_priority_display }}</dd></div><div><dt>روش تعمیر</dt><dd>{{ order.get_repair_method_display }}</dd></div><div><dt>زمان اعلام</dt><dd>{{ order.reported_at|jalali_datetime }}</dd></div><div><dt>هزینه ثبت‌شده</dt><dd>{{ order.cost }}</dd></div></dl>
+  </article>
+  <article class="panel repair-progress-card">
+    <div class="section-heading"><div><h2>اقدام واحد تعمیرات</h2><p class="muted">روش انجام، وضعیت و شرح تعمیر داخلی را ثبت کنید.</p></div></div>
+    <form method="post" action="{% url 'work_order_update' order.id %}" class="repair-form-grid">{% csrf_token %}{% for field in progress_form %}<div class="form-field{% if field.name == 'action_taken' %} wide-field{% endif %}">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}<button type="submit">ذخیره وضعیت تعمیر</button></form>
+  </article>
+</section>
+{% if order.repair_method == 'external' %}
+<section class="panel external-repair-panel">
+  <div class="section-heading"><div><h2>ثبت برون‌سپاری، خروج و ورود</h2><p class="muted">مشخصات این تعمیر برای همیشه در سابقه تجهیز نگهداری می‌شود.</p></div>{% if external %}<span class="quality-badge {{ external.quality_status }}">{{ external.get_quality_status_display }}</span>{% endif %}</div>
+  <form method="post" action="{% url 'external_repair_update' order.id %}" class="external-repair-form">{% csrf_token %}{% for field in external_form %}<div class="form-field{% if field.name == 'repair_description' or field.name == 'quality_note' %} wide-field{% endif %}">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}<button type="submit">ثبت اطلاعات تعمیرگاه و کنترل ورود</button></form>
+  {% if external and external.sent_out_date %}<div class="repair-trip-summary"><span><small>تعمیرگاه</small><b>{{ external.repair_shop }}</b></span><span><small>خروج از شرکت</small><b>{{ external.sent_out_date|jalali }}</b></span><span><small>ورود مجدد</small><b>{% if external.returned_date %}{{ external.returned_date|jalali }}{% else %}هنوز بازنگشته{% endif %}</b></span><span><small>مدت خارج از شرکت</small><b>{{ external.days_outside }} روز</b></span></div>{% endif %}
+</section>
+{% else %}
+<section class="panel repair-guidance"><b>در صورت نیاز به تعمیرگاه بیرونی</b><span>در فرم «اقدام واحد تعمیرات»، روش انجام را روی «برون‌سپاری به تعمیرگاه» قرار دهید و ذخیره کنید؛ سپس فرم خروج و ورود نمایش داده می‌شود.</span></section>
+{% endif %}
+<section class="panel permanent-history-panel">
+  <div class="section-heading"><div><h2>تاریخچه دائمی تعمیرات این تجهیز</h2><p class="muted">سوابق بسته‌شده نیز حذف نمی‌شوند و برای تحلیل خرابی تکراری باقی می‌مانند.</p></div><span class="count-badge">{{ history|length }} سابقه قبلی</span></div>
+  <div class="repair-timeline">{% for item in history %}<article class="repair-history-item{% if item.repeat_after_days != None %} repeated{% endif %}"><div class="timeline-marker"></div><div class="repair-history-head"><div><b>{{ item.title }}</b><small>{{ item.reported_at|jalali_datetime }} · {{ item.get_repair_method_display }}</small></div><span class="badge">{{ item.get_status_display }}</span></div>{% if item.external_repair %}<div class="history-shop"><b>تعمیرگاه: {{ item.external_repair.repair_shop }}</b><span>{% if item.external_repair.sent_out_date %}خروج {{ item.external_repair.sent_out_date|jalali }}{% endif %}{% if item.external_repair.returned_date %} · ورود {{ item.external_repair.returned_date|jalali }}{% endif %} · {{ item.external_repair.get_quality_status_display }}</span></div>{% endif %}{% if item.action_taken %}<p>{{ item.action_taken }}</p>{% endif %}{% if item.repeat_after_days != None %}<span class="repeat-inline">تکرار خرابی پس از {{ item.repeat_after_days }} روز</span>{% endif %}<a href="{% url 'work_order_detail' item.id %}">مشاهده پرونده کامل</a></article>{% empty %}<p class="empty">این اولین سابقه تعمیر ثبت‌شده برای تجهیز است.</p>{% endfor %}</div>
+</section>
+{% endblock %}
