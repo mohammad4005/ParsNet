@@ -1,6 +1,6 @@
 {% extends 'maintenance/base.html' %}{% load jalali_dates %}
 {% block heading %}کنترل‌های امروز{% endblock %}
-{% block subtitle %}کارهای سررسیدشده را به تفکیک تجهیز انجام دهید.{% endblock %}
+{% block subtitle %}کارهای سررسیدشده را به تفکیک تجهیزات انجام دهید.{% endblock %}
 {% block content %}<section class="entity-grid task-card-grid">
 {% for item in controls %}<article class="entity-card task-card"><div class="card-top"><span class="frequency-badge">{{ item.get_frequency_display }}</span><span class="code-chip">{{ item.equipment.code }}</span></div><h2>{{ item.title }}</h2><p>{{ item.equipment.name }}</p>{% if item.help_text %}<div class="card-note">{{ item.help_text }}</div>{% endif %}<div class="due-line">سررسید: <b>{{ item.next_due_date|jalali }}</b></div><a class="card-action primary-action" href="{% url 'perform_control' item.id %}">ثبت نتیجه کنترل</a></article>{% empty %}<div class="panel empty">امروز مورد کنترلی سررسید نشده است.</div>{% endfor %}
 </section>{% endblock %}

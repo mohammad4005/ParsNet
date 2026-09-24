@@ -10,7 +10,7 @@
   <div class="panel equipment-card">
     <h2>شناسنامه دستگاه</h2>
     <dl>
-      <div><dt>کد تجهیز</dt><dd>{{ equipment.code }}</dd></div>
+      <div><dt>کد تجهیزات</dt><dd>{{ equipment.code }}</dd></div>
       <div><dt>دسته</dt><dd>{{ equipment.category }}</dd></div>
       <div><dt>محل استقرار</dt><dd>{{ equipment.location|default:'—' }}</dd></div>
       <div><dt>ظرفیت</dt><dd>{{ equipment.capacity|default:'—' }}</dd></div>
@@ -70,13 +70,13 @@
 <section class="equipment-workspace-grid">
 <div class="panel supplies-panel">
   <div class="section-heading">
-    <div><h2>وسایل و قطعات مورد نیاز این تجهیز</h2><p class="muted">موجودی، حداقل مورد نیاز و مصرف هر وسیله را از همین بخش مدیریت کنید.</p></div>
+    <div><h2>وسایل و قطعات مورد نیاز این دستگاه</h2><p class="muted">موجودی، حداقل مورد نیاز و مصرف هر وسیله را از همین بخش مدیریت کنید.</p></div>
     <span class="count-badge">{{ supplies|length }} وسیله</span>
   </div>
   <div class="supply-layout">
     <form method="post" action="{% url 'equipment_add_supply' equipment.id %}" class="supply-add-form">
       {% csrf_token %}
-      <h3>افزودن وسیله به انبار تجهیز</h3>
+      <h3>افزودن وسیله به انبار تجهیزات</h3>
       {% for field in supply_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
       <button type="submit">+ ثبت وسیله و موجودی</button>
     </form>
@@ -95,7 +95,7 @@
             <button name="operation" value="add" class="add-stock-button">افزایش موجودی</button>
           </form>
         </div>
-      {% empty %}<p class="empty">هنوز وسیله یا قطعه‌ای برای این تجهیز ثبت نشده است.</p>{% endfor %}
+      {% empty %}<p class="empty">هنوز وسیله یا قطعه‌ای برای این دستگاه ثبت نشده است.</p>{% endfor %}
     </div>
   </div>
 </div>
@@ -157,7 +157,7 @@
 
 <section class="panel equipment-repair-history">
   <div class="section-heading">
-    <div><h2>تاریخچه تعمیرات این تجهیز</h2><p class="muted">تمام تعمیرات داخلی و بیرونی، حتی پس از تکمیل، برای همیشه در این پرونده باقی می‌مانند.</p></div>
+    <div><h2>تاریخچه تعمیرات این دستگاه</h2><p class="muted">تمام تعمیرات داخلی و بیرونی، حتی پس از تکمیل، برای همیشه در این پرونده باقی می‌مانند.</p></div>
     <span class="count-badge">{{ repair_history|length }} سابقه</span>
   </div>
   <div class="compact-repair-history">
@@ -168,7 +168,7 @@
         <span class="badge">{{ order.get_status_display }}</span>
         {% if order.repeat_after_days != None %}<em>خرابی مجدد پس از {{ order.repeat_after_days }} روز</em>{% endif %}
       </a>
-    {% empty %}<p class="empty">هنوز سابقه تعمیری برای این تجهیز ثبت نشده است.</p>{% endfor %}
+    {% empty %}<p class="empty">هنوز سابقه تعمیری برای این دستگاه ثبت نشده است.</p>{% endfor %}
   </div>
 </section>
 </div>

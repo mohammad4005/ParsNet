@@ -47,6 +47,10 @@ class RepairWorkflowTests(TestCase):
         self.assertEqual(order.status, WorkOrder.Status.DONE)
         self.assertEqual(record.repair_shop, "تعمیرگاه نمونه")
         self.assertEqual(record.days_outside, 1)
+        detail = self.client.get(reverse("work_order_detail", args=[order.pk]))
+        self.assertContains(detail, "تاریخچه دائمی تعمیرات این تجهیزات")
+        self.assertContains(detail, "پرونده جاری")
+        self.assertContains(detail, "تعمیرگاه نمونه")
         with self.assertRaises(ProtectedError):
             order.delete()
 
@@ -70,6 +74,8 @@ class RepairWorkflowTests(TestCase):
         self.assertContains(response, "هشدار خرابی تکراری")
         self.assertContains(response, "14 روز")
         self.assertContains(response, previous.title)
+        self.assertContains(response, current.title)
+        self.assertContains(response, "پرونده جاری")
         list_response = self.client.get(reverse("work_order_list"))
         self.assertEqual(list_response.status_code, 200)
         self.assertContains(list_response, current.title)

@@ -54,14 +54,14 @@ def equipment_list(request):
 @manager_required
 def equipment_create(request):
     form=EquipmentForm(request.POST or None)
-    if request.method=="POST" and form.is_valid(): form.save();messages.success(request,"تجهیز جدید ثبت شد.");return redirect("equipment_list")
-    return render(request,"maintenance/form.html",{"form":form,"title":"ثبت تجهیز جدید","submit":"ثبت تجهیز"})
+    if request.method=="POST" and form.is_valid(): form.save();messages.success(request,"تجهیزات جدید ثبت شد.");return redirect("equipment_list")
+    return render(request,"maintenance/form.html",{"form":form,"title":"ثبت تجهیزات جدید","submit":"ثبت تجهیزات"})
 @login_required
 @manager_required
 def category_list(request):
     form = EquipmentCategoryForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        form.save(); messages.success(request, "دسته تجهیز اضافه شد."); return redirect("category_list")
+        form.save(); messages.success(request, "دسته تجهیزات اضافه شد."); return redirect("category_list")
     return render(request, "maintenance/category_list.html", {"form": form, "categories": EquipmentCategory.objects.order_by("name")})
 @login_required
 def equipment_detail(request,pk):
@@ -113,7 +113,7 @@ def equipment_add_supply(request, pk):
             supply.save(update_fields=["stock_quantity","unit","minimum_quantity"])
             message="موجودی وسیله قبلی افزایش یافت."
         else:
-            supply=form.save(commit=False); supply.equipment=equipment; supply.save(); message="وسیله مورد نیاز به انبار این تجهیز اضافه شد."
+            supply=form.save(commit=False); supply.equipment=equipment; supply.save(); message="وسیله مورد نیاز به انبار این دستگاه اضافه شد."
         if quantity:
             EquipmentSupplyTransaction.objects.create(supply=supply,operation="add",quantity=quantity,performed_by=request.user)
         messages.success(request,message)
@@ -170,15 +170,16 @@ def plan_list(request): return render(request,"maintenance/plan_list.html",{"pla
 @login_required
 def service_worksheets(request):
     import jdatetime
-    from .reporting import build_service_worksheet_schedule
+    from .reporting import build_service_worksheet_schedule,paginate_service_worksheets
     data=request.GET.copy()
     if not data:
         today=timezone.localdate(); end=today+timedelta(days=7)
         data={"start_date":jdatetime.date.fromgregorian(date=today).strftime("%Y/%m/%d"),"end_date":jdatetime.date.fromgregorian(date=end).strftime("%Y/%m/%d")}
     form=ServiceWorksheetFilterForm(data)
     schedule=build_service_worksheet_schedule(form.cleaned_data) if form.is_valid() else []
+    worksheet_pages=paginate_service_worksheets(schedule)
     query_string=request.GET.urlencode() if request.GET else urlencode(data)
-    return render(request,"maintenance/service_worksheets.html",{"form":form,"schedule":schedule,"query_string":query_string})
+    return render(request,"maintenance/service_worksheets.html",{"form":form,"schedule":schedule,"worksheet_pages":worksheet_pages,"query_string":query_string})
 
 
 @login_required
@@ -228,7 +229,7 @@ def work_order_detail(request, pk):
     order=get_object_or_404(WorkOrder.objects.select_related("equipment__category","external_repair"),pk=pk)
     equipment_orders=_decorate_repair_history(WorkOrder.objects.filter(equipment=order.equipment).select_related("equipment","external_repair"))
     current=next((item for item in equipment_orders if item.pk == order.pk),order)
-    history=[item for item in equipment_orders if item.pk != order.pk][:12]
+    history=equipment_orders[:12]
     try: external=order.external_repair
     except ExternalRepairRecord.DoesNotExist: external=None
     return render(request,"maintenance/work_order_detail.html",{

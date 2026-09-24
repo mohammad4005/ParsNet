@@ -2,13 +2,13 @@
 {% block heading %}تجهیزات{% endblock %}
 {% block subtitle %}تجهیزات را به‌صورت کارت‌های کاربردی مشاهده و مدیریت کنید.{% endblock %}
 {% block content %}
-<div class="toolbar"><form><input name="q" value="{{ query }}" placeholder="نام یا کد تجهیز"><button>جست‌وجو</button></form><div><a class="button secondary-button" href="{% url 'category_list' %}">دسته‌بندی‌ها</a> <a class="button" href="{% url 'equipment_create' %}">+ ثبت تجهیز</a></div></div>
+<div class="toolbar"><form><input name="q" value="{{ query }}" placeholder="نام یا کد تجهیزات"><button>جست‌وجو</button></form><div><a class="button secondary-button" href="{% url 'category_list' %}">دسته‌بندی‌ها</a> <a class="button" href="{% url 'equipment_create' %}">+ ثبت تجهیزات</a></div></div>
 <section class="entity-grid equipment-grid">
   {% for item in items %}<article class="entity-card equipment-item-card">
     <div class="card-top"><span class="code-chip">{{ item.code }}</span><span class="status-dot {{ item.status }}">{{ item.get_status_display }}</span></div>
     <h2>{{ item.name }}</h2><p>{{ item.category }} · {{ item.location|default:'محل نامشخص' }}</p>
     <div class="card-meta"><span><small>اهمیت</small><b>{{ item.get_criticality_display }}</b></span><span><small>ظرفیت</small><b>{{ item.capacity|default:'—' }}</b></span></div>
     <a class="card-action" href="{% url 'equipment_detail' item.id %}">مشاهده و کنترل ←</a>
-  </article>{% empty %}<div class="panel empty">هنوز تجهیزی ثبت نشده است.</div>{% endfor %}
+  </article>{% empty %}<div class="panel empty">هنوز تجهیزات ثبت نشده است.</div>{% endfor %}
 </section>
 {% endblock %}

@@ -4,8 +4,8 @@
 {% block subtitle %}کارهای سررسیدشده امروز و موارد عقب‌افتاده را به‌ترتیب پیگیری کنید.{% endblock %}
 {% block content %}
 <section class="stats">
-  <a href="{% url 'equipment_list' %}"><article><b>{{ equipment_count }}</b><span>تجهیز ثبت‌شده</span></article></a>
-  <a href="{% url 'equipment_list' %}"><article><b>{{ critical_count }}</b><span>تجهیز بحرانی</span></article></a>
+  <a href="{% url 'equipment_list' %}"><article><b>{{ equipment_count }}</b><span>تجهیزات ثبت‌شده</span></article></a>
+  <a href="{% url 'equipment_list' %}"><article><b>{{ critical_count }}</b><span>تجهیزات بحرانی</span></article></a>
   <a href="{% url 'work_order_list' %}"><article><b>{{ open_orders }}</b><span>درخواست باز</span></article></a>
   <a href="{% url 'daily_controls' %}"><article><b>{{ due_controls_count }}</b><span>کنترل سررسیدشده</span></article></a>
 </section>

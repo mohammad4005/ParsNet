@@ -1,10 +1,10 @@
 {% extends 'maintenance/base.html' %}
 {% load jalali_dates %}
 {% block heading %}درخواست‌های تعمیر{% endblock %}
-{% block subtitle %}تعمیرات داخلی، برون‌سپاری و سوابق دائمی هر تجهیز را یکجا پیگیری کنید.{% endblock %}
+{% block subtitle %}تعمیرات داخلی، برون‌سپاری و سوابق دائمی تجهیزات را یکجا پیگیری کنید.{% endblock %}
 {% block content %}
 <div class="toolbar">
-  <span>تمام مراحل تعمیر، خروج، ورود و کنترل کیفیت در تاریخچه تجهیز باقی می‌ماند.</span>
+  <span>تمام مراحل تعمیر، خروج، ورود و کنترل کیفیت در تاریخچه تجهیزات باقی می‌ماند.</span>
   <a class="button" href="{% url 'work_order_create' %}">+ ثبت درخواست</a>
 </div>
 <section class="entity-grid work-order-grid">

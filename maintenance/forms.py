@@ -47,6 +47,7 @@ class MaintenancePlanForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["equipment"].label = "تجهیزات"
         if self.instance and self.instance.next_due_date:
             self.initial["next_due_date"] = jdatetime.date.fromgregorian(date=self.instance.next_due_date).strftime("%Y/%m/%d")
 
@@ -189,6 +190,10 @@ class WorkOrderForm(forms.ModelForm):
         fields = ["equipment", "title", "description", "priority", "repair_method", "status", "downtime_hours", "cost", "action_taken"]
         widgets = {"description": forms.Textarea(attrs={"rows": 4}), "action_taken": forms.Textarea(attrs={"rows": 3})}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["equipment"].label = "تجهیزات"
+
 
 class WorkOrderProgressForm(forms.ModelForm):
     class Meta:
@@ -241,7 +246,7 @@ class ExternalRepairForm(forms.ModelForm):
         sent = cleaned.get("sent_out_date")
         returned = cleaned.get("returned_date")
         if returned and not sent:
-            self.add_error("sent_out_date", "ابتدا تاریخ خروج تجهیز را ثبت کنید.")
+            self.add_error("sent_out_date", "ابتدا تاریخ خروج تجهیزات را ثبت کنید.")
         if sent and returned and returned < sent:
             self.add_error("returned_date", "تاریخ ورود نمی‌تواند قبل از تاریخ خروج باشد.")
         if cleaned.get("quality_status") != ExternalRepairRecord.QualityStatus.PENDING and not returned:

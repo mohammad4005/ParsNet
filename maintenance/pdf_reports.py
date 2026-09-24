@@ -11,7 +11,9 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from .reporting import paginate_service_worksheets
 
 
 NAVY = colors.HexColor("#102448")
@@ -110,7 +112,7 @@ def build_report_pdf(report):
 
     if report["show_overdue"]:
         story.append(p("کارهای عقب‌افتاده", heading_style))
-        overdue_data = [[hp("روز تأخیر"), hp("تاریخ سررسید"), hp("دسته"), hp("تجهیز"), hp("عنوان کار")]]
+        overdue_data = [[hp("روز تأخیر"), hp("تاریخ سررسید"), hp("دسته"), hp("تجهیزات"), hp("عنوان کار")]]
         for row in report["overdue_services"]:
             overdue_data.append([p(row.days_overdue, center_style), p(jalali(row.next_due_date)), p(row.equipment.category.name), p(row.equipment.name), p(f"سرویس: {row.display_name}")])
         for row in report["overdue_controls"]:
@@ -120,7 +122,7 @@ def build_report_pdf(report):
 
     if report["show_completed"]:
         story.append(p("کارهای انجام‌شده", heading_style))
-        completed_data = [[hp("مسئول / نتیجه"), hp("تاریخ انجام"), hp("دسته"), hp("تجهیز"), hp("عنوان کار")]]
+        completed_data = [[hp("مسئول / نتیجه"), hp("تاریخ انجام"), hp("دسته"), hp("تجهیزات"), hp("عنوان کار")]]
         for row in report["completed_services"]:
             person = (row.performed_by.get_full_name() or row.performed_by.username) if row.performed_by else "ثبت نشده"
             completed_data.append([p(person), p(jalali(row.performed_at, True)), p(row.plan.equipment.category.name), p(row.plan.equipment.name), p(f"سرویس: {row.plan.display_name}")])
@@ -130,7 +132,7 @@ def build_report_pdf(report):
         story += [table(completed_data, [32*mm, 32*mm, 30*mm, 36*mm, 50*mm]), Spacer(1, 4 * mm)]
 
     story += [p("درخواست‌های تعمیر ثبت‌شده", heading_style)]
-    order_data = [[hp("وضعیت"), hp("اولویت"), hp("تاریخ اعلام"), hp("دسته"), hp("تجهیز"), hp("عنوان درخواست")]]
+    order_data = [[hp("وضعیت"), hp("اولویت"), hp("تاریخ اعلام"), hp("دسته"), hp("تجهیزات"), hp("عنوان درخواست")]]
     for row in report["work_orders"]:
         order_data.append([p(row.get_status_display()), p(row.get_priority_display()), p(jalali(row.reported_at, True)), p(row.equipment.category.name), p(row.equipment.name), p(row.title)])
     if len(order_data) == 1: order_data.append([p("—")] * 5 + [p("درخواستی در این بازه ثبت نشده است")])
@@ -158,11 +160,11 @@ def build_service_worksheet_pdf(schedule, filters):
         title="ParsNet Service Worksheets", author="ParsNet",
     )
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("WorksheetTitle", parent=styles["Title"], fontName="PersianBold", fontSize=15, leading=21, textColor=NAVY, alignment=TA_RIGHT)
-    body_style = ParagraphStyle("WorksheetBody", parent=styles["BodyText"], fontName="Persian", fontSize=7.5, leading=10, textColor=NAVY, alignment=TA_RIGHT)
-    small_style = ParagraphStyle("WorksheetSmall", parent=body_style, fontSize=6.8, leading=9, textColor=GRAY)
+    title_style = ParagraphStyle("WorksheetTitle", parent=styles["Title"], fontName="PersianBold", fontSize=13, leading=17, textColor=NAVY, alignment=TA_RIGHT)
+    body_style = ParagraphStyle("WorksheetBody", parent=styles["BodyText"], fontName="Persian", fontSize=6.8, leading=8.4, textColor=NAVY, alignment=TA_RIGHT)
+    small_style = ParagraphStyle("WorksheetSmall", parent=body_style, fontSize=6.1, leading=7.5, textColor=GRAY)
     center_style = ParagraphStyle("WorksheetCenter", parent=body_style, alignment=TA_CENTER)
-    checkbox_style = ParagraphStyle("WorksheetCheckbox", parent=center_style, fontSize=13, leading=14)
+    checkbox_style = ParagraphStyle("WorksheetCheckbox", parent=center_style, fontSize=10, leading=10)
     header_style = ParagraphStyle("WorksheetHeader", parent=body_style, fontName="PersianBold", textColor=colors.white, alignment=TA_CENTER)
 
     def p(value, style=body_style): return Paragraph(rtl(value), style)
@@ -172,7 +174,7 @@ def build_service_worksheet_pdf(schedule, filters):
         result.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (-1, -1), "Persian"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ALIGN", (0, 0), (-1, -1), "RIGHT"), ("GRID", (0, 0), (-1, -1), .45, colors.HexColor("#CFD9E8")),
-            ("TOPPADDING", (0, 0), (-1, -1), 4 if compact else 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 4 if compact else 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.4 if compact else 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.4 if compact else 6),
             ("ROWBACKGROUNDS", (0, repeat), (-1, -1), [colors.white, PALE]),
         ]))
         if repeat:
@@ -180,34 +182,53 @@ def build_service_worksheet_pdf(schedule, filters):
         return result
 
     story = []
-    for index, entry in enumerate(schedule):
-        plan = entry["plan"]
-        if index:
+    pages = paginate_service_worksheets(schedule)
+    for page_index, entries in enumerate(pages):
+        if page_index:
             story.append(PageBreak())
         story += [
-            p("فرم میدانی بازدید و سرویس دوره‌ای", title_style),
-            p(f"{plan.display_name} - {plan.equipment.name}", body_style),
-            Spacer(1, 3 * mm),
+            p("فرم‌های میدانی بازدید و سرویس دوره‌ای", title_style),
+            p(f"برگه {page_index + 1} از {len(pages)} · فرم‌های کوتاه برای استفاده بهینه از برگه A4 پشت‌سرهم چیده شده‌اند.", small_style),
+            Spacer(1, 2 * mm),
         ]
-        meta = [
-            [p(f"تاریخ برنامه‌ریزی: {jalali(entry['due_date'])}"), p(f"تناوب: {plan.get_frequency_display()}"), p(f"دسته: {plan.equipment.category.name}"), p(f"کد تجهیز: {plan.equipment.code}")],
-            [p("ساعت انجام: ................"), p("تاریخ انجام: ....../....../......"), p("نام بازدیدکننده: ..............................."), p(f"محل: {plan.equipment.location or '—'}")],
-        ]
-        story += [styled_table(meta, [45*mm]*4, compact=True), Spacer(1, 3 * mm)]
-        rows = [[hp("توضیحات"), hp("اقدام"), hp("مشکل"), hp("سالم"), hp("راهنما"), hp("مورد کنترل و سرویس"), hp("ردیف")]]
-        for number, item in enumerate(plan.checklist.items.all(), start=1):
-            rows.append([p(""), p("□", checkbox_style), p("□", checkbox_style), p("□", checkbox_style), p(item.help_text or "—", small_style), p(item.title), p(number, center_style)])
-        if len(rows) == 1:
-            rows.append([p("—")] * 5 + [p("موردی برای این برنامه تعریف نشده است"), p("1", center_style)])
-        story += [styled_table(rows, [33*mm, 12*mm, 12*mm, 12*mm, 40*mm, 61*mm, 10*mm], repeat=1, compact=True), Spacer(1, 3*mm)]
-        notes = Table([[p("شرح ایرادها و اقدامات لازم")], [p(" ")], [p(" ")]], colWidths=[180*mm], rowHeights=[8*mm, 12*mm, 12*mm])
-        notes.setStyle(TableStyle([("GRID",(0,0),(-1,-1),.45,colors.HexColor("#CFD9E8")),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
-        story += [notes, Spacer(1, 2*mm)]
-        result_line = f"نتیجه نهایی:   □ قابل بهره‌برداری     □ نیازمند توقف     □ درخواست تعمیر ثبت شود"
-        story += [styled_table([[p(result_line)]], [180*mm], compact=True), Spacer(1, 2*mm)]
-        story += [styled_table([[p("قطعات یا اقلام مصرف‌شده: ........................................................................................................................................")]], [180*mm], compact=True), Spacer(1, 3*mm)]
-        signatures = [[Paragraph(rtl("ثبت در نرم‌افزار توسط")+"<br/><br/>........................", center_style), Paragraph(rtl("تأیید سرپرست واحد")+"<br/><br/>........................", center_style), Paragraph(rtl("امضای انجام‌دهنده")+"<br/><br/>........................", center_style)]]
-        story.append(styled_table(signatures, [60*mm]*3, compact=True, row_heights=[18*mm]))
+        for entry in entries:
+            plan = entry["plan"]
+            block = []
+            heading = Table([[
+                p(f"موعد: {jalali(entry['due_date'])}", small_style),
+                p(f"{plan.display_name} · {plan.equipment.name}", body_style),
+            ]], colWidths=[42*mm, 138*mm])
+            heading.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BLUE), ("BOX", (0, 0), (-1, -1), .7, BLUE),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]))
+            block.append(heading)
+            meta = [[
+                p(f"تناوب: {plan.get_frequency_display()}"), p(f"محل: {plan.equipment.location or '—'}"),
+                p(f"دسته: {plan.equipment.category.name}"), p(f"کد تجهیزات: {plan.equipment.code}"),
+            ], [
+                p("ساعت: ........"), p("تاریخ انجام: ....../....../......"),
+                p("بازدیدکننده: ........................"), p("شماره درخواست: ............"),
+            ]]
+            block += [styled_table(meta, [45*mm]*4, compact=True)]
+            rows = [[hp("توضیحات"), hp("اقدام"), hp("مشکل"), hp("سالم"), hp("راهنما"), hp("مورد کنترل و سرویس"), hp("ردیف")]]
+            for number, item in enumerate(plan.checklist.items.all(), start=1):
+                rows.append([p(""), p("□", checkbox_style), p("□", checkbox_style), p("□", checkbox_style), p(item.help_text or "—", small_style), p(item.title), p(number, center_style)])
+            if len(rows) == 1:
+                rows.append([p("—")] * 5 + [p("موردی برای این برنامه تعریف نشده است"), p("1", center_style)])
+            block.append(styled_table(rows, [32*mm, 11*mm, 11*mm, 11*mm, 39*mm, 66*mm, 10*mm], repeat=1, compact=True))
+            block.append(styled_table([[
+                p("قطعات مصرفی: ........................................................", small_style),
+                p("شرح ایراد/اقدام: ........................................................", small_style),
+            ]], [80*mm, 100*mm], compact=True))
+            block.append(styled_table([[
+                p("ثبت نرم‌افزار: ................", small_style), p("تأیید سرپرست: ................", small_style),
+                p("امضای انجام‌دهنده: ................", small_style),
+                p("نتیجه: □ قابل بهره‌برداری  □ توقف  □ درخواست تعمیر", small_style),
+            ]], [36*mm, 38*mm, 42*mm, 64*mm], compact=True))
+            block.append(Spacer(1, 2.2*mm))
+            story.append(KeepTogether(block))
 
     if not story:
         story = [p("فرم سرویس دوره‌ای", title_style), Spacer(1, 10*mm), p("در بازه انتخاب‌شده برنامه‌ای برای چاپ وجود ندارد.")]

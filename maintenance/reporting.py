@@ -38,6 +38,25 @@ def build_service_worksheet_schedule(cleaned):
     return schedule
 
 
+def paginate_service_worksheets(schedule, capacity=40):
+    """Pack several short service forms onto one A4 page without splitting a form."""
+    pages = []
+    current = []
+    used = 0
+    for entry in schedule:
+        item_count = max(1, entry["plan"].checklist.items.count())
+        cost = min(capacity, 7 + item_count)
+        if current and used + cost > capacity:
+            pages.append(current)
+            current = []
+            used = 0
+        current.append(entry)
+        used += cost
+    if current:
+        pages.append(current)
+    return pages
+
+
 def _apply_equipment_filters(queryset, path, equipment, category):
     if equipment:
         queryset = queryset.filter(**{path: equipment})
