@@ -1,4 +1,5 @@
 from datetime import timedelta
+from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
@@ -6,7 +7,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
-from .forms import AppUserForm,EquipmentCategoryForm,EquipmentControlItemForm,EquipmentForm,EquipmentServicePlanForm,EquipmentSupplyForm,ExternalRepairForm,MaintenancePlanForm,MaintenanceReportFilterForm,WorkOrderForm,WorkOrderProgressForm
+from .forms import AppUserForm,EquipmentCategoryForm,EquipmentControlItemForm,EquipmentForm,EquipmentServicePlanForm,EquipmentSupplyForm,ExternalRepairForm,MaintenancePlanForm,MaintenanceReportFilterForm,ServiceWorksheetFilterForm,WorkOrderForm,WorkOrderProgressForm
 from .models import ChecklistItem,ChecklistTemplate,Equipment,EquipmentCategory,EquipmentControlItem,EquipmentControlLog,EquipmentSupply,EquipmentSupplyTransaction,ExternalRepairRecord,Inspection,InspectionResult,MaintenancePlan,WorkOrder
 manager_required = user_passes_test(lambda u: u.is_superuser or u.groups.filter(name__in=["مدیر اصلی", "سرپرست نت"]).exists())
 
@@ -164,6 +165,32 @@ def perform_control(request,pk):
     return render(request,"maintenance/perform_control.html",{"item":item})
 @login_required
 def plan_list(request): return render(request,"maintenance/plan_list.html",{"plans":MaintenancePlan.objects.select_related("equipment","checklist")})
+
+
+@login_required
+def service_worksheets(request):
+    import jdatetime
+    from .reporting import build_service_worksheet_schedule
+    data=request.GET.copy()
+    if not data:
+        today=timezone.localdate(); end=today+timedelta(days=7)
+        data={"start_date":jdatetime.date.fromgregorian(date=today).strftime("%Y/%m/%d"),"end_date":jdatetime.date.fromgregorian(date=end).strftime("%Y/%m/%d")}
+    form=ServiceWorksheetFilterForm(data)
+    schedule=build_service_worksheet_schedule(form.cleaned_data) if form.is_valid() else []
+    query_string=request.GET.urlencode() if request.GET else urlencode(data)
+    return render(request,"maintenance/service_worksheets.html",{"form":form,"schedule":schedule,"query_string":query_string})
+
+
+@login_required
+def service_worksheets_pdf(request):
+    from .pdf_reports import build_service_worksheet_pdf
+    from .reporting import build_service_worksheet_schedule
+    form=ServiceWorksheetFilterForm(request.GET)
+    if not form.is_valid(): return HttpResponse("فیلتر فرم بازدید معتبر نیست.",status=400,content_type="text/plain; charset=utf-8")
+    content=build_service_worksheet_pdf(build_service_worksheet_schedule(form.cleaned_data),form.cleaned_data)
+    response=HttpResponse(content,content_type="application/pdf")
+    response["Content-Disposition"]='attachment; filename="parsnet-service-worksheets.pdf"'
+    return response
 @login_required
 @manager_required
 def plan_create(request):
@@ -260,7 +287,8 @@ def reports(request):
         data={"start_date":f"{today.year:04d}/{today.month:02d}/01","end_date":today.strftime("%Y/%m/%d"),"status":"all","group_by":"overall"}
     form=MaintenanceReportFilterForm(data)
     report=build_maintenance_report(form.cleaned_data) if form.is_valid() else None
-    return render(request,"maintenance/reports.html",{"form":form,"report":report,"query_string":request.GET.urlencode()})
+    query_string=request.GET.urlencode() if request.GET else urlencode(data)
+    return render(request,"maintenance/reports.html",{"form":form,"report":report,"query_string":query_string})
 
 @login_required
 def reports_pdf(request):

@@ -1,0 +1,39 @@
+{% extends 'maintenance/base.html' %}
+{% load jalali_dates %}
+{% block heading %}فرم‌های چاپی بازدید و سرویس{% endblock %}
+{% block subtitle %}بازه موردنظر را انتخاب کنید؛ فرم‌ها را چاپ کنید، کنار دستگاه تیک بزنید و برای ثبت نهایی تحویل دهید.{% endblock %}
+{% block content %}
+<form method="get" class="panel worksheet-filter no-print">
+  <div class="section-heading"><div><h2>ساخت فرم‌های بازدید</h2><p class="muted">تمام برنامه‌های فعال که در این بازه نوبت اجرا دارند، به‌شکل برگه A4 آماده می‌شوند.</p></div></div>
+  <div class="worksheet-filter-grid">{% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}</div>
+  <button type="submit">نمایش فرم‌های قابل چاپ</button>
+</form>
+
+<div class="document-actionbar no-print">
+  <div><b>{{ schedule|length }} فرم آماده چاپ</b><small>هر برنامه و هر نوبت اجرا، یک فرم مستقل دارد.</small></div>
+  {% if schedule %}<button type="button" onclick="window.print()" class="print-button">چاپ همه فرم‌ها</button><a class="button pdf-button" href="{% url 'service_worksheets_pdf' %}?{{ query_string }}">دانلود PDF فرم‌ها</a>{% endif %}
+</div>
+
+<div class="worksheet-pages" id="print-document">
+{% for entry in schedule %}
+  <article class="a4-document service-worksheet-page">
+    <header class="worksheet-header">
+      <div class="a4-brand"><span>P</span><div><b>پارس نت</b><small>فرم میدانی سرویس دوره‌ای</small></div></div>
+      <div><h2>{{ entry.plan.display_name }}</h2><p>{{ entry.plan.equipment.name }}</p></div>
+      <div class="worksheet-form-number"><small>تاریخ برنامه‌ریزی‌شده</small><b>{{ entry.due_date|jalali }}</b></div>
+    </header>
+    <section class="worksheet-equipment-meta">
+      <span><small>کد تجهیز</small><b>{{ entry.plan.equipment.code }}</b></span><span><small>دسته‌بندی</small><b>{{ entry.plan.equipment.category.name }}</b></span><span><small>محل استقرار</small><b>{{ entry.plan.equipment.location|default:'—' }}</b></span><span><small>تناوب</small><b>{{ entry.plan.get_frequency_display }}</b></span>
+    </section>
+    <div class="worksheet-person-row"><span>نام بازدیدکننده: ................................................</span><span>تاریخ انجام: ........../........../..........</span><span>ساعت: ............</span></div>
+    <table class="worksheet-check-table">
+      <thead><tr><th>ردیف</th><th>مورد کنترل و سرویس</th><th>راهنما</th><th>سالم</th><th>مشکل</th><th>اقدام</th><th>توضیحات</th></tr></thead>
+      <tbody>{% for item in entry.plan.checklist.items.all %}<tr><td>{{ forloop.counter }}</td><td><b>{{ item.title }}</b></td><td>{{ item.help_text|default:'—' }}</td><td class="paper-checkbox">□</td><td class="paper-checkbox">□</td><td class="paper-checkbox">□</td><td></td></tr>{% empty %}<tr><td colspan="7">موردی برای این برنامه تعریف نشده است.</td></tr>{% endfor %}</tbody>
+    </table>
+    <section class="worksheet-notes"><div><b>شرح ایرادها و اقدامات لازم</b></div><div></div><div></div></section>
+    <section class="worksheet-parts"><b>قطعات یا اقلام مصرف‌شده:</b><span>................................................................................................................................................................</span></section>
+    <footer class="worksheet-signatures"><span>امضای انجام‌دهنده<br><br>............................</span><span>تأیید سرپرست واحد<br><br>............................</span><span>ثبت در نرم‌افزار توسط<br><br>............................</span></footer>
+  </article>
+{% empty %}<div class="panel empty no-print">در بازه انتخاب‌شده برنامه سرویسی برای چاپ وجود ندارد.</div>{% endfor %}
+</div>
+{% endblock %}

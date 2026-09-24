@@ -6,6 +6,38 @@ from django.utils import timezone
 from .models import EquipmentControlItem, EquipmentControlLog, Inspection, MaintenancePlan, WorkOrder
 
 
+SERVICE_FREQUENCY_DAYS = {
+    "daily": 1, "weekly": 7, "biweekly": 14, "monthly": 30,
+    "bimonthly": 60, "quarterly": 91, "semiannual": 182, "annual": 365,
+}
+
+
+def build_service_worksheet_schedule(cleaned):
+    start = cleaned["start_date"]
+    end = cleaned["end_date"]
+    plans = MaintenancePlan.objects.filter(active=True).select_related(
+        "equipment__category", "checklist"
+    ).prefetch_related("checklist__items")
+    if cleaned.get("equipment"):
+        plans = plans.filter(equipment=cleaned["equipment"])
+    if cleaned.get("category"):
+        plans = plans.filter(equipment__category=cleaned["category"])
+
+    schedule = []
+    for plan in plans:
+        due_date = plan.next_due_date
+        step = timedelta(days=SERVICE_FREQUENCY_DAYS[plan.frequency])
+        if due_date < start:
+            step_days = SERVICE_FREQUENCY_DAYS[plan.frequency]
+            jumps = ((start - due_date).days + step_days - 1) // step_days
+            due_date += timedelta(days=jumps * step_days)
+        while due_date <= end:
+            schedule.append({"plan": plan, "due_date": due_date})
+            due_date += step
+    schedule.sort(key=lambda row: (row["due_date"], row["plan"].equipment.code, row["plan"].display_name))
+    return schedule
+
+
 def _apply_equipment_filters(queryset, path, equipment, category):
     if equipment:
         queryset = queryset.filter(**{path: equipment})

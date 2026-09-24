@@ -1,52 +1,48 @@
 {% extends 'maintenance/base.html' %}
 {% load jalali_dates %}
 {% block heading %}گزارش‌های تخصصی نت{% endblock %}
-{% block subtitle %}گزارش کارهای انجام‌شده، عقب‌افتاده و درخواست‌های تعمیر در بازه دلخواه.{% endblock %}
+{% block subtitle %}ابتدا گزارش را به‌شکل برگه A4 ببینید؛ سپس در صورت نیاز چاپ یا PDF دریافت کنید.{% endblock %}
 {% block content %}
-<form method="get" action="{% url 'reports' %}" class="panel report-filter-panel">
-  <div class="section-heading"><div><h2>تنظیم گزارش</h2><p class="muted">بازه شمسی، وضعیت و نوع تفکیک گزارش را انتخاب کنید.</p></div></div>
-  <div class="report-filter-grid">
-    {% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}
-  </div>
-  <div class="report-actions"><button type="submit">نمایش گزارش</button><button type="submit" formaction="{% url 'reports_pdf' %}" class="pdf-button">دانلود PDF حرفه‌ای</button></div>
+<form method="get" action="{% url 'reports' %}" class="panel report-filter-panel no-print">
+  <div class="section-heading"><div><h2>تنظیم گزارش</h2><p class="muted">بازه شمسی، وضعیت و نوع تفکیک را انتخاب کنید و ابتدا پیش‌نمایش را ببینید.</p></div></div>
+  <div class="report-filter-grid">{% for field in form %}<div class="form-field">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>{% endfor %}</div>
+  <div class="report-actions"><button type="submit">نمایش پیش‌نمایش A4</button></div>
 </form>
 
 {% if report %}
-<section class="stats report-summary-stats">
-  <article><b>{{ report.completed_total }}</b><span>کار انجام‌شده</span></article>
-  <article><b>{{ report.overdue_total }}</b><span>کار عقب‌افتاده</span></article>
-  <article><b>{{ report.work_orders_total }}</b><span>درخواست تعمیر</span></article>
-  <article><b>{{ report.start_date|jalali }} تا {{ report.end_date|jalali }}</b><span>بازه گزارش</span></article>
-</section>
+<div class="document-actionbar no-print">
+  <div><b>پیش‌نمایش آماده است</b><small>نسخه زیر همان ساختار برگه چاپی است.</small></div>
+  <button type="button" onclick="window.print()" class="print-button">چاپ گزارش</button>
+  <a class="button pdf-button" href="{% url 'reports_pdf' %}?{{ query_string }}">دانلود PDF</a>
+</div>
 
-<section class="panel">
-  <div class="section-heading"><div><h2>خلاصه تفکیکی</h2><p class="muted">نتایج مطابق نوع گزارش انتخاب‌شده گروه‌بندی شده‌اند.</p></div></div>
-  <div class="report-group-grid">
-    {% for row in report.group_rows %}<article class="report-group-card"><h3>{{ row.label }}</h3><div><span><b>{{ row.completed_total }}</b><small>انجام‌شده</small></span><span><b>{{ row.overdue_total }}</b><small>عقب‌افتاده</small></span><span><b>{{ row.work_orders }}</b><small>درخواست تعمیر</small></span></div></article>{% empty %}<p class="empty">در این بازه اطلاعاتی وجود ندارد.</p>{% endfor %}
-  </div>
-</section>
+<article class="a4-document report-a4" id="print-document">
+  <header class="a4-document-header">
+    <div class="a4-brand"><span>P</span><div><b>پارس نت</b><small>سامانه نگهداری و تعمیرات</small></div></div>
+    <div><h2>گزارش تخصصی نگهداری و تعمیرات</h2><p>پارس دکل گستر</p></div>
+    <div class="a4-document-number"><small>بازه گزارش</small><b>{{ report.start_date|jalali }}</b><span>تا {{ report.end_date|jalali }}</span></div>
+  </header>
 
-<section class="report-detail-grid">
-  {% if report.show_overdue %}<div class="panel report-status-panel overdue-panel">
-    <div class="section-heading"><div><h2>کارهای عقب‌افتاده</h2><p class="muted">سرویس‌ها و کنترل‌هایی که تا پایان بازه انجام نشده‌اند.</p></div><span class="overdue-badge">{{ report.overdue_total }} مورد</span></div>
-    <div class="report-item-list">
-      {% for item in report.overdue_services %}<div class="report-item"><div><b>سرویس: {{ item.display_name }}</b><small>{{ item.equipment.name }} · {{ item.equipment.category.name }} · سررسید {{ item.next_due_date|jalali }}</small></div><span class="overdue-badge">{{ item.days_overdue }} روز تأخیر</span></div>{% endfor %}
-      {% for item in report.overdue_controls %}<div class="report-item"><div><b>کنترل: {{ item.title }}</b><small>{{ item.equipment.name }} · {{ item.equipment.category.name }} · سررسید {{ item.next_due_date|jalali }}</small></div><span class="overdue-badge">{{ item.days_overdue }} روز تأخیر</span></div>{% empty %}{% if not report.overdue_services %}<p class="empty">کار عقب‌افتاده‌ای وجود ندارد.</p>{% endif %}{% endfor %}
-    </div>
-  </div>{% endif %}
+  <section class="a4-meta-row">
+    <span><small>نوع گزارش</small><b>{% if report.group_by == 'equipment' %}تفکیک دستگاه{% elif report.group_by == 'category' %}تفکیک دسته‌بندی{% else %}کلی و جامع{% endif %}</b></span>
+    <span><small>وضعیت</small><b>{% if report.status == 'completed' %}فقط انجام‌شده{% elif report.status == 'overdue' %}فقط عقب‌افتاده{% else %}همه کارها{% endif %}</b></span>
+    <span><small>محدوده</small><b>{% if report.equipment_filter %}{{ report.equipment_filter.name }}{% elif report.category_filter %}{{ report.category_filter.name }}{% else %}همه تجهیزات{% endif %}</b></span>
+  </section>
 
-  {% if report.show_completed %}<div class="panel report-status-panel completed-panel">
-    <div class="section-heading"><div><h2>کارهای انجام‌شده</h2><p class="muted">سوابق سرویس‌ها و کنترل‌های ثبت‌شده در بازه.</p></div><span class="stock-ok-badge">{{ report.completed_total }} مورد</span></div>
-    <div class="report-item-list">
-      {% for item in report.completed_services %}<div class="report-item"><div><b>سرویس: {{ item.plan.display_name }}</b><small>{{ item.plan.equipment.name }} · {{ item.performed_at|jalali_datetime }} · مسئول: {% if item.performed_by %}{{ item.performed_by.get_full_name|default:item.performed_by.username }}{% else %}ثبت نشده{% endif %}</small></div><span class="stock-ok-badge">انجام شد</span></div>{% endfor %}
-      {% for item in report.completed_controls %}<div class="report-item"><div><b>کنترل: {{ item.control_item.title }}</b><small>{{ item.control_item.equipment.name }} · {{ item.performed_at|jalali_datetime }}</small></div><span class="badge">{{ item.get_result_display }}</span></div>{% empty %}{% if not report.completed_services %}<p class="empty">کار انجام‌شده‌ای وجود ندارد.</p>{% endif %}{% endfor %}
-    </div>
-  </div>{% endif %}
-</section>
+  <section class="a4-summary-row"><div><b>{{ report.completed_total }}</b><span>انجام‌شده</span></div><div><b>{{ report.overdue_total }}</b><span>عقب‌افتاده</span></div><div><b>{{ report.work_orders_total }}</b><span>درخواست تعمیر</span></div></section>
 
-<section class="panel">
-  <div class="section-heading"><div><h2>درخواست‌های تعمیر این بازه</h2><p class="muted">تمام درخواست‌های ثبت‌شده در محدوده زمانی انتخابی.</p></div><span class="count-badge">{{ report.work_orders_total }} درخواست</span></div>
-  <div class="report-group-grid">{% for order in report.work_orders %}<article class="report-order-card"><div><b>{{ order.title }}</b><small>{{ order.equipment.name }} · {{ order.equipment.category.name }}</small></div><span class="badge">{{ order.get_status_display }}</span><small>{{ order.reported_at|jalali_datetime }} · {{ order.get_priority_display }}</small></article>{% empty %}<p class="empty">درخواستی در این بازه ثبت نشده است.</p>{% endfor %}</div>
-</section>
+  <section class="a4-report-section">
+    <h3>خلاصه تفکیکی</h3>
+    <table class="a4-table"><thead><tr><th>عنوان</th><th>سرویس انجام‌شده</th><th>کنترل انجام‌شده</th><th>سرویس عقب‌افتاده</th><th>کنترل عقب‌افتاده</th><th>تعمیر</th></tr></thead><tbody>{% for row in report.group_rows %}<tr><td><b>{{ row.label }}</b></td><td>{{ row.completed_services }}</td><td>{{ row.completed_controls }}</td><td>{{ row.overdue_services }}</td><td>{{ row.overdue_controls }}</td><td>{{ row.work_orders }}</td></tr>{% empty %}<tr><td colspan="6">اطلاعاتی در این بازه وجود ندارد.</td></tr>{% endfor %}</tbody></table>
+  </section>
+
+  {% if report.show_overdue %}<section class="a4-report-section page-break-avoid"><h3>کارهای عقب‌افتاده</h3><table class="a4-table"><thead><tr><th>عنوان کار</th><th>تجهیز</th><th>دسته</th><th>سررسید</th><th>تأخیر</th></tr></thead><tbody>{% for item in report.overdue_services %}<tr><td>سرویس: {{ item.display_name }}</td><td>{{ item.equipment.name }}</td><td>{{ item.equipment.category.name }}</td><td>{{ item.next_due_date|jalali }}</td><td>{{ item.days_overdue }} روز</td></tr>{% endfor %}{% for item in report.overdue_controls %}<tr><td>کنترل: {{ item.title }}</td><td>{{ item.equipment.name }}</td><td>{{ item.equipment.category.name }}</td><td>{{ item.next_due_date|jalali }}</td><td>{{ item.days_overdue }} روز</td></tr>{% empty %}{% if not report.overdue_services %}<tr><td colspan="5">کار عقب‌افتاده‌ای وجود ندارد.</td></tr>{% endif %}{% endfor %}</tbody></table></section>{% endif %}
+
+  {% if report.show_completed %}<section class="a4-report-section"><h3>کارهای انجام‌شده</h3><table class="a4-table"><thead><tr><th>عنوان کار</th><th>تجهیز</th><th>دسته</th><th>تاریخ انجام</th><th>مسئول / نتیجه</th></tr></thead><tbody>{% for item in report.completed_services %}<tr><td>سرویس: {{ item.plan.display_name }}</td><td>{{ item.plan.equipment.name }}</td><td>{{ item.plan.equipment.category.name }}</td><td>{{ item.performed_at|jalali_datetime }}</td><td>{% if item.performed_by %}{{ item.performed_by.get_full_name|default:item.performed_by.username }}{% else %}ثبت نشده{% endif %}</td></tr>{% endfor %}{% for item in report.completed_controls %}<tr><td>کنترل: {{ item.control_item.title }}</td><td>{{ item.control_item.equipment.name }}</td><td>{{ item.control_item.equipment.category.name }}</td><td>{{ item.performed_at|jalali_datetime }}</td><td>{{ item.get_result_display }}</td></tr>{% empty %}{% if not report.completed_services %}<tr><td colspan="5">کار انجام‌شده‌ای وجود ندارد.</td></tr>{% endif %}{% endfor %}</tbody></table></section>{% endif %}
+
+  <section class="a4-report-section"><h3>درخواست‌های تعمیر</h3><table class="a4-table"><thead><tr><th>عنوان</th><th>تجهیز</th><th>دسته</th><th>تاریخ اعلام</th><th>اولویت</th><th>وضعیت</th></tr></thead><tbody>{% for order in report.work_orders %}<tr><td>{{ order.title }}</td><td>{{ order.equipment.name }}</td><td>{{ order.equipment.category.name }}</td><td>{{ order.reported_at|jalali_datetime }}</td><td>{{ order.get_priority_display }}</td><td>{{ order.get_status_display }}</td></tr>{% empty %}<tr><td colspan="6">درخواستی ثبت نشده است.</td></tr>{% endfor %}</tbody></table></section>
+
+  <footer class="a4-document-footer"><span>تهیه‌شده توسط سامانه پارس نت</span><span>امضای مسئول نت: ............................</span></footer>
+</article>
 {% endif %}
 {% endblock %}

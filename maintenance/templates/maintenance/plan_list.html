@@ -1,6 +1,6 @@
 {% extends 'maintenance/base.html' %}{% load jalali_dates %}
 {% block heading %}سرویس‌های دوره‌ای{% endblock %}
 {% block subtitle %}برنامه‌های هر دستگاه را در یک نمای کارت‌محور پیگیری کنید.{% endblock %}
-{% block content %}<div class="toolbar"><span>برنامه جدید از داخل صفحه همان تجهیز ساخته می‌شود.</span><a class="button" href="{% url 'equipment_list' %}">رفتن به تجهیزات</a></div><section class="entity-grid task-card-grid">
+{% block content %}<div class="toolbar"><span>برنامه جدید از داخل صفحه همان تجهیز ساخته می‌شود.</span><div><a class="button secondary-button" href="{% url 'service_worksheets' %}">فرم چاپی بازدید</a> <a class="button" href="{% url 'equipment_list' %}">رفتن به تجهیزات</a></div></div><section class="entity-grid task-card-grid">
 {% for plan in plans %}<article class="entity-card task-card service-card"><div class="card-top"><span class="frequency-badge">{{ plan.get_frequency_display }}</span><span class="code-chip">{{ plan.equipment.code }}</span></div><h2>{{ plan.display_name }}</h2><p>{{ plan.equipment.name }}</p><div class="due-line">سررسید بعدی: <b>{{ plan.next_due_date|jalali }}</b></div><a class="card-action primary-action" href="{% url 'inspect_plan' plan.id %}">اجرای برنامه سرویس</a></article>{% empty %}<div class="panel empty">برنامه‌ای ثبت نشده است.</div>{% endfor %}
 </section>{% endblock %}

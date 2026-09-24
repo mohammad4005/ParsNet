@@ -5,8 +5,9 @@ from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+import jdatetime
 
-from .models import Equipment, EquipmentCategory, ExternalRepairRecord, WorkOrder
+from .models import ChecklistItem, ChecklistTemplate, Equipment, EquipmentCategory, ExternalRepairRecord, MaintenancePlan, WorkOrder
 
 
 class RepairWorkflowTests(TestCase):
@@ -72,3 +73,40 @@ class RepairWorkflowTests(TestCase):
         list_response = self.client.get(reverse("work_order_list"))
         self.assertEqual(list_response.status_code, 200)
         self.assertContains(list_response, current.title)
+
+
+class PrintableDocumentsTests(TestCase):
+    def setUp(self):
+        user = get_user_model().objects.create_user(username="print-user", password="test-pass")
+        self.client.force_login(user)
+        category = EquipmentCategory.objects.create(name="تجهیزات چاپ")
+        equipment = Equipment.objects.create(code="PRINT-01", name="دستگاه فرم چاپی", category=category, location="سالن آزمون")
+        checklist = ChecklistTemplate.objects.create(name="چک‌لیست چاپ", category=category)
+        ChecklistItem.objects.create(template=checklist, title="کنترل حفاظ", help_text="سلامت و استحکام بررسی شود")
+        self.plan = MaintenancePlan.objects.create(
+            service_name="بازدید چاپی", equipment=equipment, checklist=checklist,
+            frequency=MaintenancePlan.Frequency.WEEKLY, next_due_date=timezone.localdate(), active=True,
+        )
+
+    def test_a4_report_preview_and_pdf_are_available(self):
+        today = jdatetime.date.fromgregorian(date=timezone.localdate()).strftime("%Y/%m/%d")
+        query = {"start_date": today, "end_date": today, "status": "all", "group_by": "overall"}
+        preview = self.client.get(reverse("reports"), query)
+        self.assertContains(preview, "پیش‌نمایش آماده است")
+        self.assertContains(preview, "a4-document")
+        pdf = self.client.get(reverse("reports_pdf"), query)
+        self.assertEqual(pdf.status_code, 200)
+        self.assertEqual(pdf["Content-Type"], "application/pdf")
+        self.assertTrue(pdf.content.startswith(b"%PDF"))
+
+    def test_service_worksheet_preview_and_pdf_include_checklist(self):
+        today = jdatetime.date.fromgregorian(date=timezone.localdate()).strftime("%Y/%m/%d")
+        query = {"start_date": today, "end_date": today}
+        preview = self.client.get(reverse("service_worksheets"), query)
+        self.assertContains(preview, self.plan.display_name)
+        self.assertContains(preview, "کنترل حفاظ")
+        self.assertContains(preview, "چاپ همه فرم‌ها")
+        pdf = self.client.get(reverse("service_worksheets_pdf"), query)
+        self.assertEqual(pdf.status_code, 200)
+        self.assertEqual(pdf["Content-Type"], "application/pdf")
+        self.assertTrue(pdf.content.startswith(b"%PDF"))

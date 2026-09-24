@@ -48,11 +48,17 @@
     const monthLength = Math.round((next - first) / 86400000);
     const offset = (first.getUTCDay() + 1) % 7;
     const selected = parseValue(activeInput?.value || "");
+    const today = persianParts(new Date());
     for (let i = 0; i < offset; i += 1) days.appendChild(document.createElement("span"));
     for (let day = 1; day <= monthLength; day += 1) {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = fa(day);
+      if (today.year === viewYear && today.month === viewMonth && today.day === day) {
+        button.classList.add("today");
+        button.setAttribute("aria-label", `${fa(day)}، امروز`);
+        button.title = "امروز";
+      }
       if (selected && selected.year === viewYear && selected.month === viewMonth && selected.day === day) button.classList.add("selected");
       button.addEventListener("click", () => {
         activeInput.value = fa(`${viewYear}/${pad(viewMonth)}/${pad(day)}`);

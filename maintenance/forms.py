@@ -150,6 +150,39 @@ class MaintenanceReportFilterForm(forms.Form):
         if cleaned.get("start_date") and cleaned.get("end_date") and cleaned["start_date"] > cleaned["end_date"]:
             self.add_error("end_date", "تاریخ پایان باید بعد از تاریخ شروع باشد.")
         return cleaned
+
+
+class ServiceWorksheetFilterForm(forms.Form):
+    start_date = forms.CharField(label="از تاریخ", widget=JALALI_DATE_WIDGET)
+    end_date = forms.CharField(label="تا تاریخ", widget=JALALI_DATE_WIDGET)
+    equipment = forms.ModelChoiceField(label="دستگاه", queryset=Equipment.objects.all(), required=False, empty_label="همه دستگاه‌ها")
+    category = forms.ModelChoiceField(label="دسته‌بندی", queryset=EquipmentCategory.objects.all(), required=False, empty_label="همه دسته‌ها")
+
+    @staticmethod
+    def _clean_jalali(raw):
+        value = raw.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")).replace("-", "/")
+        year, month, day = [int(part) for part in value.split("/")]
+        return jdatetime.date(year, month, day).togregorian()
+
+    def clean_start_date(self):
+        try:
+            return self._clean_jalali(self.cleaned_data["start_date"])
+        except (ValueError, TypeError):
+            raise forms.ValidationError("تاریخ شروع را از تقویم شمسی انتخاب کنید.")
+
+    def clean_end_date(self):
+        try:
+            return self._clean_jalali(self.cleaned_data["end_date"])
+        except (ValueError, TypeError):
+            raise forms.ValidationError("تاریخ پایان را از تقویم شمسی انتخاب کنید.")
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("start_date") and cleaned.get("end_date") and cleaned["start_date"] > cleaned["end_date"]:
+            self.add_error("end_date", "تاریخ پایان باید بعد از تاریخ شروع باشد.")
+        return cleaned
+
+
 class WorkOrderForm(forms.ModelForm):
     class Meta:
         model = WorkOrder
