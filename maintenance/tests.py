@@ -105,6 +105,14 @@ class PrintableDocumentsTests(TestCase):
         self.assertEqual(pdf["Content-Type"], "application/pdf")
         self.assertTrue(pdf.content.startswith(b"%PDF"))
 
+    def test_compact_dashboard_shows_operational_indicators(self):
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "نمای عملیاتی نگهداری و تعمیرات")
+        self.assertContains(response, "dashboard-kpi-grid")
+        self.assertContains(response, "کار در ۷ روز آینده")
+        self.assertContains(response, self.plan.display_name)
+
     def test_service_worksheet_preview_and_pdf_include_checklist(self):
         today = jdatetime.date.fromgregorian(date=timezone.localdate()).strftime("%Y/%m/%d")
         query = {"start_date": today, "end_date": today}

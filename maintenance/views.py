@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.db.models import F
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
@@ -39,12 +40,29 @@ def _decorate_repair_history(orders):
 def dashboard(request):
     today=timezone.localdate()
     due=MaintenancePlan.objects.filter(active=True,next_due_date__lte=today).select_related("equipment","checklist")
-    due_plans=list(due[:8])
+    due_plans=list(due[:5])
     for plan in due_plans: plan.days_overdue=(today-plan.next_due_date).days
     controls=EquipmentControlItem.objects.filter(active=True,next_due_date__lte=today).select_related("equipment")
-    due_controls=list(controls[:8])
+    due_controls=list(controls[:5])
     for item in due_controls: item.days_overdue=(today-item.next_due_date).days
-    return render(request,"maintenance/dashboard.html",{"equipment_count":Equipment.objects.count(),"critical_count":Equipment.objects.filter(criticality="high").count(),"open_orders":WorkOrder.objects.exclude(status="done").count(),"due_plans":due_plans,"due_plans_count":due.count(),"due_controls":due_controls,"due_controls_count":controls.count(),"recent_orders":WorkOrder.objects.select_related("equipment")[:6]})
+    week_start=today-timedelta(days=6)
+    next_week=today+timedelta(days=7)
+    completed_today=Inspection.objects.filter(performed_at__date=today).count()+EquipmentControlLog.objects.filter(performed_at__date=today).count()
+    completed_week=Inspection.objects.filter(performed_at__date__range=(week_start,today)).count()+EquipmentControlLog.objects.filter(performed_at__date__range=(week_start,today)).count()
+    open_orders_qs=WorkOrder.objects.exclude(status=WorkOrder.Status.DONE)
+    external_out=ExternalRepairRecord.objects.filter(sent_out_date__isnull=False,returned_date__isnull=True).count()
+    low_stock=EquipmentSupply.objects.filter(stock_quantity__lt=F("minimum_quantity")).count()
+    upcoming_count=MaintenancePlan.objects.filter(active=True,next_due_date__gt=today,next_due_date__lte=next_week).count()+EquipmentControlItem.objects.filter(active=True,next_due_date__gt=today,next_due_date__lte=next_week).count()
+    context={
+        "equipment_count":Equipment.objects.count(),"critical_count":Equipment.objects.filter(criticality="high").count(),
+        "open_orders":open_orders_qs.count(),"urgent_orders":open_orders_qs.filter(priority=WorkOrder.Priority.URGENT).count(),
+        "due_plans":due_plans,"due_plans_count":due.count(),"overdue_plans_count":due.filter(next_due_date__lt=today).count(),
+        "due_controls":due_controls,"due_controls_count":controls.count(),"overdue_controls_count":controls.filter(next_due_date__lt=today).count(),
+        "completed_today":completed_today,"completed_week":completed_week,"low_stock_count":low_stock,
+        "external_out_count":external_out,"upcoming_count":upcoming_count,
+        "recent_orders":WorkOrder.objects.select_related("equipment")[:5],
+    }
+    return render(request,"maintenance/dashboard.html",context)
 @login_required
 def equipment_list(request):
     items=Equipment.objects.select_related("category");q=request.GET.get("q","").strip()

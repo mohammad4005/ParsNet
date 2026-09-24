@@ -1,48 +1,50 @@
 {% extends 'maintenance/base.html' %}
 {% load jalali_dates %}
-{% block heading %}نمای کلی نگهداری و تعمیرات{% endblock %}
-{% block subtitle %}کارهای سررسیدشده امروز و موارد عقب‌افتاده را به‌ترتیب پیگیری کنید.{% endblock %}
+{% block heading %}نمای عملیاتی نگهداری و تعمیرات{% endblock %}
+{% block subtitle %}وضعیت امروز، عقب‌ماندگی‌ها و هشدارهای مهم مجموعه در یک نگاه.{% endblock %}
 {% block content %}
-<section class="stats">
-  <a href="{% url 'equipment_list' %}"><article><b>{{ equipment_count }}</b><span>تجهیزات ثبت‌شده</span></article></a>
-  <a href="{% url 'equipment_list' %}"><article><b>{{ critical_count }}</b><span>تجهیزات بحرانی</span></article></a>
-  <a href="{% url 'work_order_list' %}"><article><b>{{ open_orders }}</b><span>درخواست باز</span></article></a>
-  <a href="{% url 'daily_controls' %}"><article><b>{{ due_controls_count }}</b><span>کنترل سررسیدشده</span></article></a>
-</section>
+<div class="compact-dashboard">
+  <section class="dashboard-kpi-grid">
+    <a href="{% url 'equipment_list' %}" class="dashboard-kpi blue"><span class="kpi-icon">ت</span><div><small>کل تجهیزات</small><b>{{ equipment_count }}</b><em>{{ critical_count }} مورد بحرانی</em></div></a>
+    <a href="{% url 'daily_controls' %}" class="dashboard-kpi amber"><span class="kpi-icon">ک</span><div><small>کنترل سررسیدشده</small><b>{{ due_controls_count }}</b><em>{{ overdue_controls_count }} مورد عقب‌افتاده</em></div></a>
+    <a href="{% url 'plan_list' %}" class="dashboard-kpi violet"><span class="kpi-icon">س</span><div><small>سرویس سررسیدشده</small><b>{{ due_plans_count }}</b><em>{{ overdue_plans_count }} مورد عقب‌افتاده</em></div></a>
+    <a href="{% url 'work_order_list' %}" class="dashboard-kpi red"><span class="kpi-icon">تـ</span><div><small>درخواست تعمیر باز</small><b>{{ open_orders }}</b><em>{{ urgent_orders }} مورد اضطراری</em></div></a>
+    <a href="{% url 'reports' %}" class="dashboard-kpi green"><span class="kpi-icon">✓</span><div><small>انجام‌شده امروز</small><b>{{ completed_today }}</b><em>{{ completed_week }} مورد در ۷ روز</em></div></a>
+    <a href="{% url 'equipment_list' %}" class="dashboard-kpi cyan"><span class="kpi-icon">ا</span><div><small>کمبود موجودی</small><b>{{ low_stock_count }}</b><em>اقلام زیر حداقل</em></div></a>
+  </section>
 
-<section class="dashboard-columns">
-<div class="panel dashboard-task-section controls-first">
-  <div class="section-heading">
-    <div><h2>کنترل‌های سررسیدشده</h2><p class="muted">کنترل‌ها پیش از برنامه‌های سرویس نمایش داده می‌شوند.</p></div>
-    <span class="count-badge">{{ due_controls_count }} مورد</span>
-  </div>
-  {% for item in due_controls %}
-    <div class="dashboard-task-row">
-      <div><b>{{ item.title }}</b><small>{{ item.equipment.name }} · {{ item.get_frequency_display }} · موعد {{ item.next_due_date|jalali }}</small></div>
-      {% if item.days_overdue %}<span class="overdue-badge">{{ item.days_overdue }} روز عقب‌افتاده</span>{% else %}<span class="today-badge">موعد امروز</span>{% endif %}
-      <a class="button small-button" href="{% url 'perform_control' item.id %}">ثبت کنترل</a>
+  <section class="dashboard-signal-bar">
+    <div><span class="signal-dot green"></span><b>{{ completed_today }}</b><small>فعالیت ثبت‌شده امروز</small></div>
+    <div><span class="signal-dot amber"></span><b>{{ upcoming_count }}</b><small>کار در ۷ روز آینده</small></div>
+    <div><span class="signal-dot red"></span><b>{{ external_out_count }}</b><small>دستگاه خارج از شرکت</small></div>
+    <div><span class="signal-dot blue"></span><b>{{ critical_count }}</b><small>تجهیزات با اهمیت بحرانی</small></div>
+  </section>
+
+  <section class="dashboard-columns">
+    <div class="panel dashboard-task-section compact-task-panel controls-first">
+      <div class="section-heading"><div><h2>کنترل‌های امروز</h2><p class="muted">اولویت اجرا بر اساس میزان تأخیر</p></div><span class="count-badge">{{ due_controls_count }} مورد</span></div>
+      <div class="compact-task-list">
+      {% for item in due_controls %}
+        <div class="dashboard-task-row"><div><b>{{ item.title }}</b><small>{{ item.equipment.name }} · {{ item.get_frequency_display }} · {{ item.next_due_date|jalali }}</small></div>{% if item.days_overdue %}<span class="overdue-badge">{{ item.days_overdue }} روز تأخیر</span>{% else %}<span class="today-badge">امروز</span>{% endif %}<a class="task-arrow" href="{% url 'perform_control' item.id %}" title="ثبت کنترل">←</a></div>
+      {% empty %}<p class="compact-empty">کنترل سررسیدشده‌ای وجود ندارد.</p>{% endfor %}
+      </div>
+      <a class="dashboard-more" href="{% url 'daily_controls' %}">همه کنترل‌ها ←</a>
     </div>
-  {% empty %}<p class="empty">کنترل عقب‌افتاده‌ای وجود ندارد.</p>{% endfor %}
-  <p><a class="text-link" href="{% url 'daily_controls' %}">نمایش همه کنترل‌ها ←</a></p>
-</div>
 
-<div class="panel dashboard-task-section services-after-controls">
-  <div class="section-heading">
-    <div><h2>سرویس‌های دوره‌ای انجام‌نشده</h2><p class="muted">مدت تأخیر هر برنامه نسبت به تاریخ سررسید نمایش داده می‌شود.</p></div>
-    <span class="count-badge">{{ due_plans_count }} برنامه</span>
-  </div>
-  {% for plan in due_plans %}
-    <div class="dashboard-task-row">
-      <div><b>{{ plan.display_name }}</b><small>{{ plan.equipment.name }} · {{ plan.get_frequency_display }} · موعد {{ plan.next_due_date|jalali }}</small></div>
-      {% if plan.days_overdue %}<span class="overdue-badge">{{ plan.days_overdue }} روز است انجام نشده</span>{% else %}<span class="today-badge">موعد امروز</span>{% endif %}
-      <a class="button small-button" href="{% url 'inspect_plan' plan.id %}">انجام سرویس</a>
+    <div class="panel dashboard-task-section compact-task-panel services-after-controls">
+      <div class="section-heading"><div><h2>سرویس‌های دوره‌ای</h2><p class="muted">برنامه‌های انجام‌نشده تا امروز</p></div><span class="count-badge">{{ due_plans_count }} برنامه</span></div>
+      <div class="compact-task-list">
+      {% for plan in due_plans %}
+        <div class="dashboard-task-row"><div><b>{{ plan.display_name }}</b><small>{{ plan.equipment.name }} · {{ plan.get_frequency_display }} · {{ plan.next_due_date|jalali }}</small></div>{% if plan.days_overdue %}<span class="overdue-badge">{{ plan.days_overdue }} روز تأخیر</span>{% else %}<span class="today-badge">امروز</span>{% endif %}<a class="task-arrow" href="{% url 'inspect_plan' plan.id %}" title="انجام سرویس">←</a></div>
+      {% empty %}<p class="compact-empty">سرویس سررسیدشده‌ای وجود ندارد.</p>{% endfor %}
+      </div>
+      <a class="dashboard-more" href="{% url 'plan_list' %}">همه برنامه‌ها ←</a>
     </div>
-  {% empty %}<p class="empty">سرویس دوره‌ای عقب‌افتاده‌ای وجود ندارد.</p>{% endfor %}
-</div>
-</section>
+  </section>
 
-<section class="panel">
-  <div class="section-heading"><div><h2>آخرین درخواست‌های تعمیر</h2></div><a class="button" href="{% url 'work_order_create' %}">+ ثبت درخواست تعمیر</a></div>
-  <div class="mini-card-grid">{% for order in recent_orders %}<div class="mini-card"><div><b>{{ order.title }}</b><small>{{ order.equipment.name }}</small></div><span class="badge">{{ order.get_status_display }}</span></div>{% empty %}<p class="empty">هنوز درخواستی ثبت نشده است.</p>{% endfor %}</div>
-</section>
+  <section class="panel compact-repair-panel">
+    <div class="section-heading"><div><h2>آخرین درخواست‌های تعمیر</h2><p class="muted">پنج پرونده‌ای که اخیراً تغییر کرده‌اند</p></div><a class="button small-button" href="{% url 'work_order_create' %}">+ درخواست جدید</a></div>
+    <div class="compact-repair-dashboard">{% for order in recent_orders %}<a href="{% url 'work_order_detail' order.id %}"><div><b>{{ order.title }}</b><small>{{ order.equipment.name }} · {{ order.reported_at|jalali_datetime }}</small></div><span class="badge">{{ order.get_status_display }}</span></a>{% empty %}<p class="compact-empty">هنوز درخواستی ثبت نشده است.</p>{% endfor %}</div>
+  </section>
+</div>
 {% endblock %}
